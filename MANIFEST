@@ -23,3 +23,4 @@ t/test.gsd
 t/gsd.t
 t/subhdr.t
 TODO
+META.yml                                Module meta-data (added by MakeMaker)

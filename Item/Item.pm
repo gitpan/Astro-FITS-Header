@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-'$Revision: 1.8 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.9 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 =head1 METHODS
 
@@ -300,6 +300,17 @@ sub configure {
   }
 }
 
+=item B<freeze>
+
+Method to return a blessed reference to the object so that we can store
+ths object on disk using Data::Dumper module.
+
+=cut
+
+sub freeze {
+  my $self = shift;
+  return bless $self, 'Astro::FITS::Header::Item';
+}
 
 =item B<parse_card>
 
@@ -670,5 +681,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 1.8 2001/03/17 02:18:00 allan Exp $
+#     $Id: Item.pm,v 1.9 2002/03/29 17:58:02 allan Exp $
 1;

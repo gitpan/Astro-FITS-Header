@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-'$Revision: 1.16 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.18 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 =head1 METHODS
 
@@ -311,6 +311,9 @@ sub configure {
       my $method = lc($key);
       $self->$method( $hash{$key}) if exists $hash{$key};
     }
+    # COMMENT, HISTORY, and blank cards are special
+    $self->type('COMMENT') if $self->keyword =~ /^(COMMENT|HISTORY|)$/;
+
     # End cards are special, need only do a Keyword => 'END' to configure
     $self->type('END') if $self->keyword() eq 'END';
   }
@@ -412,8 +415,6 @@ sub parse_card {
     # We have comments
     $comment = substr($card,8);
     $comment =~ s/\s+$//;  # Trailing spaces
-    $comment =~ s/^\s+\///; # Leading spaces and slashes
-    $comment =~ s/^\s+//;  # Leading space
 
     # Alasdair wanted to store this as a value
     $self->comment( $comment );
@@ -615,8 +616,8 @@ sub _stringify {
 
   } elsif (defined $type && $type eq 'COMMENT') {
 
-    # Comments are from character 11 - 80
-    $card = sprintf("%-10s%-70s", $card, $comment);
+    # Comments are from character 9 - 80
+    $card = sprintf("%-8s%-72s", $card, $comment);
 
   } elsif (!defined $type && !defined $value && !defined $comment) {
 
@@ -734,5 +735,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 1.16 2003/04/25 22:50:44 mjc Exp $
+#     $Id: Item.pm,v 1.18 2003/07/02 16:25:03 allan Exp $
 1;

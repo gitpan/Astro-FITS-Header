@@ -9,6 +9,7 @@ Astro::FITS::Header::NDF - Manipulate FITS headers from NDF files
   use Astro::FITS::Header::NDF;
 
   $hdr = new Astro::FITS::Header::NDF( Cards => \@cards );
+  $hdr = new Astro::FITS::Header::NDF( Items => \@items );
   $hdr = new Astro::FITS::Header::NDF( ndfID => $indf );
   $hdr = new Astro::FITS::Header::NDF( File => $file );
 
@@ -18,21 +19,24 @@ Astro::FITS::Header::NDF - Manipulate FITS headers from NDF files
 =head1 DESCRIPTION
 
 This module makes use of the Starlink L<NDF|NDF> module to read and write to
-and NDF FITS extension or to a C<.HEADER> block in an HDS container file.
+an NDF FITS extension or to a C<.HEADER> block in an HDS container file.
 
-It stores information about a FITS header block in an object. Takes an hash as an arguement, with either an array reference pointing to an array of FITS header cards, or a filename, or (alternatively) and NDF identifier.
+It stores information about a FITS header block in an object. Takes an
+hash as an argument, with either an array reference pointing to an
+array of FITS header cards, array of C<Astro::FITS::Header::Item>
+objects, or a filename, or (alternatively) an NDF identifier.
 
 =cut
 
 use strict;
 use Carp;
-use NDF qw/ :ndf :dat :err /;
+use NDF qw/ :ndf :dat :err :hds /;
 
 use base qw/ Astro::FITS::Header /;
 
 use vars qw/ $VERSION /;
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 =head1 METHODS
 
@@ -46,11 +50,12 @@ Reads a FITS header from an NDF.
   $hdr->configure( ndfID => $indf );
   $hdr->configure( File => $filename );
 
-Accepts an NDF identifier or a filename. If both ndfID and File keys
-exist, ndfID key takes priority.
+Accepts an NDF identifier or a filename. If both C<ndfID> and C<File> keys
+exist, C<ndfID> key takes priority.
 
-If the file open does not work, a second attempt is made with
-".HEADER" appended in case this was a UKIRT-style HDS container.
+If the file is actually an HDS container, an attempt will be made
+to read a ".HEADER" NDF inside that container (this is the standard
+layout of UKIRT (and some JCMT) data files.
 
 =cut
 
@@ -62,7 +67,8 @@ sub configure {
   my ($indf, $started);
   my $task = ref($self);
 
-  return $self->SUPER::configure(%args) if exists $args{Cards};
+  return $self->SUPER::configure(%args) 
+    if exists $args{Cards} or exists $args{Items};
 
   # Store the definition of good locally
   my $status = &NDF::SAI__OK;
@@ -85,22 +91,34 @@ sub configure {
     my $file = $args{File};
     $file =~ s/\.sdf$//;
 
-    # Open it
-    ndf_find(&NDF::DAT__ROOT(), $file, $indf, $status);
+    # First we need to find whether we have an HDS container
+    # or a straight NDF. Rather than simply trying an ndf_find
+    # on both (which causes leaks in the NDF system) we explicitly
+    # open it using HDS
+    hds_open( $file, 'READ', my $hdsloc, $status);
 
-    # If status is bad, try assuming it is a HDS container
-    # with UKIRT style .HEADER component
-    if ($status != $good) {
-      # dont want to contaminate existing status
-      my $lstat = $good;
-      $file .= ".HEADER";
-      ndf_find(&NDF::DAT__ROOT(), $file, $indf, $lstat);
+    # Find its type
+    dat_type( $hdsloc, my $type, $status);
 
-      # flush bad status if we succedded
-      err_annul($status) if $lstat == $good;
+    my $ndffile;
+    if ($status == $good) {
 
+      # If we have an NDF we can simply reopen it
+      if ($type =~ /NDF/i) {
+	$ndffile = $file;
+      } else {
+	# For now simply assume we can find a .HEADER
+	# in future we could tweak this to default to first NDF
+	# it finds if no .HEADER
+	$ndffile = $file . ".HEADER";
+      }
+
+      # Close the HDS file
+      dat_annul( $hdsloc, $status);
+
+      # Open the NDF
+      ndf_find(&NDF::DAT__ROOT(), $ndffile, $indf, $status);
     }
-
 
   } else {
 
@@ -186,15 +204,15 @@ sub configure {
 
 =item B<writehdr>
 
-Write a fits header to an NDF.
+Write a FITS header to an NDF.
 
   $hdr->writehdr( ndfID => $indf );
   $hdr->writehdr( File => $file );
 
-Accepts an NDF identifier or a filename.  If both ndfID and File keys
-exist, ndfID key takes priority.
+Accepts an NDF identifier or a filename.  If both C<ndfID> and C<File> keys
+exist, C<ndfID> key takes priority.
 
-Returns undef on error, true if the header was written successfully.
+Returns C<undef> on error, true if the header was written successfully.
 
 =cut
 
@@ -304,7 +322,7 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2001 Particle Physics and Astronomy Research Council.
+Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
 =cut

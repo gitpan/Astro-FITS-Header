@@ -23,7 +23,7 @@ package Astro::FITS::Header::CFITSIO;
 #    Alasdair Allan (aa@astro.ex.ac.uk)
 
 #  Revision:
-#     $Id: CFITSIO.pm,v 1.3 2001/03/29 22:04:32 allan Exp $
+#     $Id: CFITSIO.pm,v 1.7 2002/11/27 20:22:41 allan Exp $
 
 #  Copyright:
 #     Copyright (C) 2001 Particle Physics and Astronomy Research Council. 
@@ -40,7 +40,7 @@ Astro::FITS::Header::CFITSIO - Manipulates FITS headers from a FITS file
 =head1 SYNOPSIS
 
   use Astro::FITS::Header::CFITSIO;
-  
+
   $header = new Astro::FITS::Header::CFITSIO( Cards => \@array );
   $header = new Astro::FITS::Header::CFITSIO( File => $file );
   $header = new Astro::FITS::Header::CFITSIO( fitsID => $ifits );
@@ -65,16 +65,16 @@ use vars qw/ $VERSION /;
 use Astro::FITS::Header::Item;
 use base qw/ Astro::FITS::Header /;
 
-use CFITSIO qw / :longnames :constants /;
+use Astro::FITS::CFITSIO qw / :longnames :constants /;
 use Carp;
 
-'$Revision: 1.3 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.7 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 # C O N S T R U C T O R ----------------------------------------------------
 
 =head1 REVISION
 
-$Id: CFITSIO.pm,v 1.3 2001/03/29 22:04:32 allan Exp $
+$Id: CFITSIO.pm,v 1.7 2002/11/27 20:22:41 allan Exp $
 
 =head1 METHODS
 
@@ -87,28 +87,37 @@ Reads a FITS header from a FITS HDU
   $header->configure( Cards => \@cards );
   $header->configure( fitsID => $ifits );
   $header->configure( File => $file );
+  $header->configure( File => $file, ReadOnly => $bool );
 
 Accepts an FITS identifier or a filename. If both fitsID and File keys
 exist, fitsID key takes priority.
+
+If C<File> is specified, the file is normally opened in ReadWrite
+mode.  The C<ReadOnly> argument takes a boolean value which determines
+whether the file is opened ReadOnly.
 
 =cut
 
 sub configure {
   my $self = shift;
   
-  my %args = @_;
+  my %args = ( ReadOnly => 0, @_ );
   
   # itialise the inherited status to OK.  
   my $status = 0;
   my $ifits;
 
-  return $self->SUPER::configure(%args) if exists $args{Cards};
-  
+  return $self->SUPER::configure(%args) 
+    if exists $args{Cards} or exists $args{Items};
+
   # read the args hash
   if (exists $args{fitsID}) {
      $ifits = $args{fitsID};
   } elsif (exists $args{File}) {
-     $ifits = CFITSIO::open_file( $args{File}, CFITSIO::READWRITE(), $status );
+     $ifits = Astro::FITS::CFITSIO::open_file( $args{File}, 
+		  $args{ReadOnly} ? Astro::FITS::CFITSIO::READONLY() :
+			            Astro::FITS::CFITSIO::READWRITE(),
+					       $status );
   } else {
      croak("Arguement hash does not contain fitsID, File or Cards");
   }
@@ -143,8 +152,10 @@ sub configure {
      croak("Error $status opening FITS file");
   }
   
-  # close file
-  $ifits->close_file( $status );
+  # close file, but only if we opened it
+  $ifits->close_file( $status )
+    unless exists $args{fitsID};
+
   return;
   
 }
@@ -179,7 +190,8 @@ sub writehdr {
   if (exists $args{fitsID}) {
      $ifits = $args{fitsID};
   } elsif (exists $args{File}) {
-     $ifits = CFITSIO::open_file( $args{File}, CFITSIO::READWRITE(), $status );
+     $ifits = Astro::FITS::CFITSIO::open_file( $args{File}, 
+			 Astro::FITS::CFITSIO::READWRITE(), $status );
   } else {
      croak("Argument hash does not contain fitsID, File or Cards");
   }
@@ -226,8 +238,10 @@ sub writehdr {
      croak("Error $status opening FITS file");
   }
     
-  # close file
-  $ifits->close_file( $status );
+  # close file, but only if we opened it
+  $ifits->close_file( $status )
+    unless exists $args{fitsID};
+
   return;
    
 }
@@ -238,12 +252,12 @@ sub writehdr {
 
 =head1 NOTES
 
-This module requires Pete Ratzlaff's L<CFITSIO|CFITSIO> module, 
+This module requires Pete Ratzlaff's L<Astro::FITS::CFITSIO> module, 
 and  William Pence's C<cfitsio> subroutine library (v2.1 or greater).
 
 =head1 SEE ALSO
 
-L<Astro::FITS::Header>, L<Astro::FITS::Header::Item>, L<Astro::FITS::Header::NDF>, L<CFITSIO>
+L<Astro::FITS::Header>, L<Astro::FITS::Header::Item>, L<Astro::FITS::Header::NDF>, L<Astro::FITS::CFITSIO>
 
 =head1 AUTHORS
 
@@ -251,7 +265,7 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>,
 
 =head1 COPYRIGHT
 
-Copyright (C) 2001 Particle Physics and Astronomy Research Council.
+Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify

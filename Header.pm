@@ -23,7 +23,7 @@ package Astro::FITS::Header;
 #    Craig DeForest (deforest@boulder.swri.edu)
 
 #  Revision:
-#     $Id: Header.pm,v 1.13 2002/06/19 23:51:54 timj Exp $
+#     $Id: Header.pm,v 1.15 2002/11/15 02:37:38 timj Exp $
 
 #  Copyright:
 #     Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council. 
@@ -57,7 +57,7 @@ use vars qw/ $VERSION /;
 
 use Astro::FITS::Header::Item;
 
-'$Revision: 1.13 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.15 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 # Operator overloads
 use overload '""' => "stringify";
@@ -66,7 +66,7 @@ use overload '""' => "stringify";
 
 =head1 REVISION
 
-$Id: Header.pm,v 1.13 2002/06/19 23:51:54 timj Exp $
+$Id: Header.pm,v 1.15 2002/11/15 02:37:38 timj Exp $
 
 =head1 METHODS
 
@@ -470,9 +470,9 @@ sub cards {
   my $self = shift;
   return map { "$_" } @{$self->{HEADER}};
 }
-   
-# A L L I T E M S ---------------------------------------------------------   
- 
+
+# A L L I T E M S ---------------------------------------------------------
+
 =item B<allitems>
 
 Returns the header as an array of FITS::Header:Item objects.
@@ -484,8 +484,8 @@ Returns the header as an array of FITS::Header:Item objects.
 sub allitems {
    my $self = shift;
    return map { $_ } @{$self->{HEADER}};
-} 
-   
+}
+
 # C O N F I G U R E -------------------------------------------------------
 
 =back
@@ -496,9 +496,11 @@ sub allitems {
 
 =item B<configure>
 
-Configures the object, takes an array of FITS header cards as input.
+Configures the object, takes an array of FITS header cards 
+or an array of Astro::FITS::Header::Item objects as input.
 
   $header->configure( Cards => \@array );
+  $header->configure( Items => \@array );
 
 Does nothing if the array is not supplied.
 
@@ -513,7 +515,7 @@ sub configure {
   # grab the argument list
   my %args = @_;
 
-  if (defined $args{Cards}) {
+  if (exists $args{Cards} && defined $args{Cards}) {
 
     # First translate each incoming card into a Item object
     # Any existing cards are removed
@@ -526,6 +528,10 @@ sub configure {
     # to reuse the method for this rather than repeating code
     $self->_rebuild_lookup;
 
+  } elsif (exists $args{Items} && defined $args{Items}){
+    # We have an array of Astro::FITS::Header::Items
+    @{$self->{HEADER}} = @{ $args{Items} };
+    $self->_rebuild_lookup;
   }
 }
 
@@ -663,7 +669,7 @@ appended automatically on FETCH, so that
   $hash{HISTORY} .= "Added multi-line string support";
 
 adds a new HISTORY comment card, while
-  
+
   $hash{TELESCOP} .= " dome B";
 
 only modifies an existing TELESCOP card.

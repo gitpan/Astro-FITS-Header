@@ -11,12 +11,16 @@ Makefile.PL
 MANIFEST
 NDF/NDF.pm
 NDF/Makefile.PL
+GSD/GSD.pm
+GSD/Makefile.PL
 README
 t/cfitsio.fit
 t/cfitsio.t
 t/ndf.t
 t/parse.t
 t/tied.t
+t/test.gsd
+t/gsd.t
 TODO
 
 

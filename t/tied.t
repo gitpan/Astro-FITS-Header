@@ -1,3 +1,4 @@
+#!perl
 # Astro::FITS::Header test harness
 
 # strict
@@ -5,7 +6,7 @@ use strict;
 
 #load test
 use Test;
-BEGIN { plan tests => 264 };
+BEGIN { plan tests => 279 };
 
 # load modules
 use Astro::FITS::Header;
@@ -25,7 +26,7 @@ my $header = new Astro::FITS::Header( Cards => \@raw );
 
 # tie
 my %keywords;
-tie %keywords, "Astro::FITS::Header", $header;   
+tie %keywords, "Astro::FITS::Header", $header;
 
 # fetch
 my $value = $keywords{"TELESCOP"};
@@ -35,6 +36,13 @@ ok( "$value", "UKIRT, Mauna Kea, HI");
 $keywords{"TELESCOP"} = "JCMT, Mauna Kea, HI";
 my @values = $header->value("TELESCOP");
 ok( "$values[0]", "JCMT, Mauna Kea, HI");
+
+# Get the comment, set a new one and retrieve it
+ok($keywords{"TELESCOP_COMMENT"}, "Telescope name");
+my $new = "Not a telescope";
+$keywords{TELESCOP_COMMENT} = $new;
+ok($keywords{TELESCOP_COMMENT}, $new);
+
 
 # store 
 $keywords{"LIFE"} = 42;
@@ -116,8 +124,12 @@ foreach $key (keys %keywords) {
     ok($header->keyword($line),$key);
 
     if($key ne 'COMMENT') {  # Skip [multiline] comments...
-
-   	ok($values[0],$keywords{$key});
+	# END card is a special case -- should return ' '
+	if($key eq 'END') {
+	    ok(' ',$keywords{$key});
+	} else {
+	    ok($values[0],$keywords{$key});
+	}
     }
 
     do {
@@ -126,10 +138,60 @@ foreach $key (keys %keywords) {
 
 }
 
+# Test array ref return
+my $hdr = tied %keywords;
+
+# First get the string
+my $str = $keywords{COMMENT};
+ok(not ref $str );
+
+# Then the array
+$hdr->tiereturnsref(1);
+my $strref = $keywords{COMMENT};
+
+ok(ref($strref), "ARRAY");
+
+my @strings = @$strref;
+
+ok(scalar(@strings), 3); # There are 4 comments
+ok(join('',@strings), $str);
+$hdr->tiereturnsref(0);
+
+# Test that we can copy in a new hash
+# This test will fail in v2.4 of Astro::FITS::Header
+my $href = \%keywords;
+%{ $href } = ( TELESCOP => 'GEMINI', instrume => 'MICHELLE' );
+ok($href->{TELESCOP}, 'GEMINI');
+ok($href->{INSTRUME}, 'MICHELLE');
+
+
+# Test that SIMPLE and END get put at the beginning and end, respectively
+ 
+ok($href->{SIMPLE},undef);
+ok($href->{END},undef);
+ 
+$keywords{SIMPLE} = 0;
+$keywords{END} = "Drop this string on the floor";
+my @keys = keys %keywords;
+ok($keys[0],'SIMPLE');
+ok($keys[3],'END');
+ok($keywords{SIMPLE},0);
+ok($keywords{END},' ');
+
+
 #clear
 undef %keywords;
 
 ok($header->keyword(0),undef);
+
+
+# Test the override
+my %keywords2;
+my $header2 = new Astro::FITS::Header( Cards => \@raw );
+tie %keywords2, "Astro::FITS::Header", $header2, tiereturnsref => 1;
+my $value2 = $keywords2{COMMENT};
+ok(ref $value2, "ARRAY");
+
 
 exit;
 

@@ -1,3 +1,75 @@
+2003-03-12 Alasdair Allan <aa@astro.ex.ac.uk> (Version 2.6.1)
+
+        * t/hierarch.t: Added more test cases.
+
+2003-03-12 Alasdair Allan <aa@astro.ex.ac.uk> (Version 2.6)
+
+        * Minor documentation tweaks and released as Version 2.6
+        
+2003-03-12 Craig DeForest <deforest@boulder.swri.edu> 
+
+        * Header.pm 
+	   - FETCH: END card always returns ' ' if present, undef if not.
+	   - STORE: END & SIMPLE cards are always put in the right place.
+	   - STORE: Cleaned out some extra cruft in the card assignment 
+	            block
+	   - new:   SIMPLE & END cards are assigned automagically
+	   - Documentation: several improvements.
+
+	* Item.pm
+	   - 'F' evaluates false if assigned to a card of type LOGICAL
+	     (already evaluated false if assigned to a card of unknown type).
+	   - END cards no longer emit warnings with 'use strict'.
+	   
+2003-03-11  Alasdair Allan <aa@astro.ex.ac.uk> (Version 2.5.1)
+
+        * Minor documentation tweaks, badged as version 2.5
+        
+        * t/hierarch.t: Added test harness for ESO HIERARCH header keywords
+
+2003-03-10  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* Header.pm: Add tiereturnshash, and configure it from TIEHASH
+	
+	* Header.pm (FETCH): Respect the new tiereturnshash method. If
+	true, will return multi-valued items as a reference to an array
+	rather than as a joined string (tied interface does not respect
+	calling context).
+
+	* Header.pm (FETCH/STORE): Tied interface can now retrieve or set
+	the comment string associated with an item by adding '_COMMENT' to
+	the keyword.
+
+2002-01-19  Malcolm J. Currie <mjc@star.rl.ac.uk>
+
+        * Item/Item.pm: Added support for HIERARCH hierarchical keywords.
+
+2002-12-05  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* Header.pm (FETCH): Tied interface now returns a hash ref when a
+	subheader is encountered. (STORE): And accepts a hash via STORE
+
+2002-12-04  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* NDF/NDF.pm (configure): Allow for someone to supply an explicit
+	HDS path to an NDF
+
+	* Item/Item.pm: Sub-headers can now be stored with
+	Astro::FITS::Header objects, using type HEADER
+
+	* Header.pm (STORE): Allow an Astro::FITS::Header object to be
+	stored through the tied interface.
+
+2002-12-03  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* Header.pm (insert{): Fix problem with tied hash when
+	doing %$tieref = %new
+
+2002-12-02  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* NDF/NDF.pm (configure): Fix problem with SCUBA raw data. The
+	files are NDFs but are not declared as such in the type field
+
 2002-11-27  Alasdair Allan <aa@astro.ex.ac.uk> (Version 2.4)
 
         * Added patch provided by Diab Jerius <djerius@cfa.harvard.edu>

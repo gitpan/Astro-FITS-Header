@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-'$Revision: 1.10 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.15 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 =head1 METHODS
 
@@ -124,13 +124,25 @@ the FITS card.
 
 When a new value is supplied any C<card> in the cache is invalidated.
 
+If the value is an C<Astro::FITS::Header> object, the type is automatically
+set to "HEADER".
+
 =cut
 
 sub value {
   my $self = shift;
-  if (@_) { 
-    $self->{Value} = shift;
+  if (@_) {
+    my $value = shift;
+    $self->{Value} = $value;
     $self->{Card} = undef;
+
+    if (UNIVERSAL::isa($value,"Astro::FITS::Header" )) {
+      $self->type( "HEADER" );
+    } elsif (defined $self->type && $self->type eq 'HEADER') {
+      # HEADER is only valid if we really are a HEADER
+      $self->type(undef);
+    }
+
   }
   return $self->{Value};
 }
@@ -166,7 +178,11 @@ the FITS card.
   $item->type( "INT" );
 
 Allowed types are "LOGICAL", "INT", "FLOAT", "STRING", "COMMENT"
-and "UNDEF"
+and "UNDEF".
+
+A special type, "HEADER", is used to specify that this item refers
+to a subsidiary header (eg a header in an MEFITS file or a header
+in an NDF in an HDS container).
 
 =cut
 
@@ -185,7 +201,7 @@ object.  It is created if there is no cached version.
   $card = $item->card();
 
 If a new card is supplied it will only be accepted if it is 80
-characters long or less. The string is padded with spaces if it is too
+characters long or fewer.  The string is padded with spaces if it is too
 short. No attempt (yet) )is made to shorten the string if it is too
 long since that may require a check to see if the value is a string
 that must be shortened with a closing single quote.  Returns C<undef>
@@ -324,10 +340,18 @@ Returns an empty list on error.
 =cut
 
 # Fits standard specifies
-# Characters 1:8  KEYWORD (trailing spaces)  COMMENT is special
-#            9:10 "= "  for a valid value (unless COMMENT keyword)
+# Characters 1:8  KEYWORD (trailing spaces)  Comment cards: COMMENT,
+#                 HISTORY, blank and HIERARCH are special
+#            9:10 "= "  for a valid value (unless comment keyword)
 #            11:80 The Value   "/" used to indicate a comment
 
+# HIERARCH keywords
+#      This is a comment but used to store values in an extended,
+#      hierarchical name space.  The keyword is the string before
+#      the equals sign and ignoring trailing spaces.  The value
+#      follows the first equals sign.  The comment is delimited by a
+#      solidus following a string or a single vlaue.  
+#      
 # The value can contain:
 #  STRINGS:
 #      '  starting at position 12
@@ -345,14 +369,23 @@ sub parse_card {
   return () unless @_;
 
   my $card = shift;
+  my $equals_col = 8;
 
   # Value is only present if an = is found in position 9
   my ($value, $comment) = ('', '');
-  my $keyword = uc(substr($card, 0, 8));
+  my $keyword = uc(substr($card, 0, $equals_col));
+
+  # HIERARCH special case.  It's a comment, but want to treat it as
+  # a multi-word keyword followed by a value and/or comment.
+  if ( $keyword eq 'HIERARCH' || $card =~ /^\s+HIERARCH/ ) {
+    $equals_col = index( $card, "=" );
+    $keyword = uc(substr($card, 0, $equals_col ));
+  }
   $keyword =~ s/\s+$//;
+  $keyword =~ s/\s/./g;
 
   # update object
-  $self->keyword( $keyword);
+  $self->keyword( $keyword );
 
   # END cards are special
   if ($keyword eq 'END') {
@@ -360,14 +393,14 @@ sub parse_card {
     $self->value(undef);
     $self->type( "END" );
     $self->card( $card ); # store it after storing indiv components
-    return("END", undef,undef);
+    return("END", undef, undef);
   }
 
   return () if length($card) == 0;
 
   # Check for comment or HISTORY
   if ($keyword eq 'COMMENT' || $keyword eq 'HISTORY' ||
-      substr($card,8,2) ne "= ") {
+      (substr($card,8,2) ne "= " && $keyword !~ /^HIERARCH/)) {
 
     # Store the type
     $self->type( "COMMENT" );
@@ -386,7 +419,7 @@ sub parse_card {
   }
 
   # We must have a value after '= '
-  my $rest = substr($card,10);
+  my $rest = substr($card, $equals_col+1);
 
   # Remove leading spaces
   $rest =~ s/^\s+//;
@@ -547,6 +580,11 @@ The object state is not updated by this routine.
 
 This routine is only called if the card cache has been cleared.
 
+If this item points to a sub-header the stringification returns
+a comment indicating that we have a sub header. In the future
+this behaviour may change (either to return nothing, or
+to return the stringified header itself).
+
 =cut
 
 sub _stringify {
@@ -558,12 +596,18 @@ sub _stringify {
   my $comment = $self->comment;
   my $type = $self->type;
 
+  # Special case for HEADER type
+  if (defined $type && $type eq 'HEADER') {
+    $type = "COMMENT";
+    $comment = "Contains a subsidiary header";
+  }
+
   # Sort out the keyword. This always uses up the first 8 characters
   my $card = sprintf("%-8s", $keyword);
 
   # End card and Comments first
   if (defined $type && $type eq 'END' ) {
-    $card = sprintf("%-10s%-70s", $card);
+    $card = sprintf("%-10s%-70s", $card, "");
 
   } elsif (defined $type && $type eq 'COMMENT') {
 
@@ -602,7 +646,7 @@ sub _stringify {
 
       # Change the value for logical
       if ($type eq 'LOGICAL') {
-	$value = ($value ? 'T' : 'F' );
+	$value = ( ($value && ($value ne 'F')) ? 'T' : 'F' );
       }
 
       # An undefined value should simply propogate as an empty
@@ -632,7 +676,7 @@ sub _stringify {
 
 	# chop to 65 characters
 	$value = substr($value,0, 65);
-        
+
 	# if the string has less than 8 characters pad it to put the
 	# closing quote at CHAR 20
 	if (length($value) < 8 ) {
@@ -686,5 +730,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 1.10 2002/06/20 00:07:33 timj Exp $
+#     $Id: Item.pm,v 1.15 2003/03/12 23:09:28 allan Exp $
 1;

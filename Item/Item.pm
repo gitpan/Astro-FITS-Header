@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-'$Revision: 1.15 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.16 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 =head1 METHODS
 
@@ -341,7 +341,7 @@ Returns an empty list on error.
 
 # Fits standard specifies
 # Characters 1:8  KEYWORD (trailing spaces)  Comment cards: COMMENT,
-#                 HISTORY, blank and HIERARCH are special
+#                 HISTORY, blank, and HIERARCH are special.
 #            9:10 "= "  for a valid value (unless comment keyword)
 #            11:80 The Value   "/" used to indicate a comment
 
@@ -350,7 +350,8 @@ Returns an empty list on error.
 #      hierarchical name space.  The keyword is the string before
 #      the equals sign and ignoring trailing spaces.  The value
 #      follows the first equals sign.  The comment is delimited by a
-#      solidus following a string or a single vlaue.  
+#      solidus following a string or a single value.   The HIERARCH
+#      keyword may follow a blank keyword in columns 1:8..
 #      
 # The value can contain:
 #  STRINGS:
@@ -381,6 +382,9 @@ sub parse_card {
     $equals_col = index( $card, "=" );
     $keyword = uc(substr($card, 0, $equals_col ));
   }
+  # Remove leading and trailing spaces, and replace interior spaces
+  # between the keywords with a single 
+  $keyword =~ s/^\s+// if ( $card =~ /^\s+HIERARCH/ );
   $keyword =~ s/\s+$//;
   $keyword =~ s/\s/./g;
 
@@ -730,5 +734,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 1.15 2003/03/12 23:09:28 allan Exp $
+#     $Id: Item.pm,v 1.16 2003/04/25 22:50:44 mjc Exp $
 1;

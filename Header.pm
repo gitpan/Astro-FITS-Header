@@ -23,7 +23,7 @@ package Astro::FITS::Header;
 #    Craig DeForest (deforest@boulder.swri.edu)
 
 #  Revision:
-#     $Id: Header.pm,v 1.21 2003/03/12 23:09:27 allan Exp $
+#     $Id: Header.pm,v 1.22 2003/03/22 01:21:12 timj Exp $
 
 #  Copyright:
 #     Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council. 
@@ -57,7 +57,7 @@ use vars qw/ $VERSION /;
 
 use Astro::FITS::Header::Item;
 
-'$Revision: 1.21 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.22 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 # Operator overloads
 use overload '""' => "stringify",
@@ -67,7 +67,7 @@ use overload '""' => "stringify",
 
 =head1 REVISION
 
-$Id: Header.pm,v 1.21 2003/03/12 23:09:27 allan Exp $
+$Id: Header.pm,v 1.22 2003/03/22 01:21:12 timj Exp $
 
 =head1 METHODS
 
@@ -889,14 +889,12 @@ sub FETCH {
       @out = @values;
     } else {
 
-      # Multi values so join
-      @out = ( join("\n", @values) );
+      # Multi values so join [protecting warnings from undef]
+      @out = ( join("\n", map { defined $_ ? $_ : '' } @values) );
 
       # This is a hangover from the STORE (where we add a \ continuation 
       # character to multiline strings)
-      for my $out (@out) {
-	$out =~ s/\\\n//gs if (defined($out));
-      }
+      $out[0] =~ s/\\\n//gs if (defined($out[0]));
     }
   }
 

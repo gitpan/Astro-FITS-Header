@@ -2,7 +2,7 @@ package Astro::FITS::Header;
 
 # ---------------------------------------------------------------------------
 
-#+ 
+#+
 #  Name:
 #    Astro::FITS::Header
 
@@ -23,8 +23,7 @@ package Astro::FITS::Header;
 #    Craig DeForest (deforest@boulder.swri.edu)
 
 #  Revision:
-#     $Id: Header.pm,v 1.12 2002/06/10 19:30:06 allan Exp $
-     
+#     $Id: Header.pm,v 1.13 2002/06/19 23:51:54 timj Exp $
 
 #  Copyright:
 #     Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council. 
@@ -58,13 +57,16 @@ use vars qw/ $VERSION /;
 
 use Astro::FITS::Header::Item;
 
-'$Revision: 1.12 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.13 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+
+# Operator overloads
+use overload '""' => "stringify";
 
 # C O N S T R U C T O R ----------------------------------------------------
 
 =head1 REVISION
 
-$Id: Header.pm,v 1.12 2002/06/10 19:30:06 allan Exp $
+$Id: Header.pm,v 1.13 2002/06/19 23:51:54 timj Exp $
 
 =head1 METHODS
 
@@ -543,6 +545,26 @@ sub freeze {
 
 =back
 
+=head2 Operator Overloading
+
+These operators are overloaded:
+
+=over 4
+
+=item B<"">
+
+When the object is used in a string context the FITS header
+block is returned as a single string.
+
+=cut
+
+sub stringify {
+  my $self = shift;
+  return join("\n", $self->cards )."\n";
+}
+
+=back
+
 =head2 Private methods
 
 These methods are for internal use only.
@@ -891,4 +913,4 @@ Craig DeForest E<lt>deforest@boulder.swri.eduE<gt>
 
 # L A S T  O R D E R S ------------------------------------------------------
 
-1;                                                                  
+1;

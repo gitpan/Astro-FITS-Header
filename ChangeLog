@@ -1,3 +1,22 @@
+2002-06-24  Alasdair Allan <aa@astro.ex.ac.uk>
+
+        * Minor documentation tweaks to reflect Tim's changes,
+          released as v2.2.
+
+2002-06-19  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* NDF/NDF.pm: Add first support for .HEADER HDS containers 
+
+	* Item/Item.pm (_stringify): Support blank lines
+
+	* Header.pm: Add stringification overload 
+
+2002-06-12  Tim Jenness  <timj@jach.hawaii.edu>
+
+	* t/tied.t: Use two argument form of ok()
+
+	* t/parse.t: Use two argument form of ok()
+
 2002-06-10  Alasdair Allan <aa@astro.ex.ac.uk> 
 
         * Minor documentation changes, integrated patches into the main

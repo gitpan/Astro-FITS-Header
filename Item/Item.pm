@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-'$Revision: 1.9 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.10 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 =head1 METHODS
 
@@ -570,6 +570,11 @@ sub _stringify {
     # Comments are from character 11 - 80
     $card = sprintf("%-10s%-70s", $card, $comment);
 
+  } elsif (!defined $type && !defined $value && !defined $comment) {
+
+    # This is a blank line
+    $card = " " x 80;
+
   } else {
     # A real keyword/value so add the "= "
     $card .= "= ";
@@ -681,5 +686,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 1.9 2002/03/29 17:58:02 allan Exp $
+#     $Id: Item.pm,v 1.10 2002/06/20 00:07:33 timj Exp $
 1;

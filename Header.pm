@@ -22,7 +22,7 @@ package Astro::FITS::Header;
 #    Tim Jenness (t.jenness@jach.hawaii.edu)
 
 #  Revision:
-#     $Id: Header.pm,v 1.8 2001/03/28 00:26:31 allan Exp $
+#     $Id: Header.pm,v 1.9 2001/07/04 23:50:42 allan Exp $
 
 #  Copyright:
 #     Copyright (C) 2001 Particle Physics and Astronomy Research Council. 
@@ -55,13 +55,13 @@ use vars qw/ $VERSION /;
 
 use Astro::FITS::Header::Item;
 
-'$Revision: 1.8 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+'$Revision: 1.9 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
 
 # C O N S T R U C T O R ----------------------------------------------------
 
 =head1 REVISION
 
-$Id: Header.pm,v 1.8 2001/03/28 00:26:31 allan Exp $
+$Id: Header.pm,v 1.9 2001/07/04 23:50:42 allan Exp $
 
 =head1 METHODS
 
@@ -353,9 +353,9 @@ sub replacebyname{
 
 Removes a FITS header card object by name
 
-  $card = $header->removebyname($keyword);
+  @card = $header->removebyname($keyword);
 
-returns the removed card.
+returns the removed cards.
 
 =cut
 
@@ -368,6 +368,8 @@ sub removebyname{
          if ( exists ${$self->{LOOKUP}}{$keyword} && 
 	      defined ${$self->{LOOKUP}}{$keyword} );
 
+   print "\@index = @index\n\n";
+   
    # loop over the keywords
    my @cards = map { splice @{$self->{HEADER}}, $_, 1; } @index;
 
@@ -439,8 +441,23 @@ Return the object contents as an array of FITS cards.
 
 sub cards {
   my $self = shift;
-  return map { "$_"  } @{$self->{HEADER}};
+  return map { "$_" } @{$self->{HEADER}};
 }
+   
+# A L L I T E M S ---------------------------------------------------------   
+ 
+=item B<allitems>
+
+Returns the header as an array of FITS::Header:Item objects.
+
+   @items = $header->allitems();
+
+=cut
+
+sub allitems {
+   my $self = shift;
+   return map { $_ } @{$self->{HEADER}};
+} 
    
 # C O N F I G U R E -------------------------------------------------------
 

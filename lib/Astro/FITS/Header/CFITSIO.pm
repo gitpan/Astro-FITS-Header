@@ -22,12 +22,13 @@ package Astro::FITS::Header::CFITSIO;
 #  Authors:
 #    Alasdair Allan (aa@astro.ex.ac.uk)
 #    Jim Lewis (jrl@ast.cam.ac.uk)
+#    Diab Jerius
 
 #  Revision:
-#     $Id: CFITSIO.pm,v 1.9 2003/10/21 13:00:47 allan Exp $
+#     $Id: CFITSIO.pm,v 3.0 2006/08/19 00:09:14 timj Exp $
 
 #  Copyright:
-#     Copyright (C) 2001 Particle Physics and Astronomy Research Council. 
+#     Copyright (C) 2001-2006 Particle Physics and Astronomy Research Council. 
 #     All Rights Reserved.
 
 #-
@@ -69,13 +70,13 @@ use base qw/ Astro::FITS::Header /;
 use Astro::FITS::CFITSIO qw / :longnames :constants /;
 use Carp;
 
-'$Revision: 1.9 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
 
 # C O N S T R U C T O R ----------------------------------------------------
 
 =head1 REVISION
 
-$Id: CFITSIO.pm,v 1.9 2003/10/21 13:00:47 allan Exp $
+$Id: CFITSIO.pm,v 3.0 2006/08/19 00:09:14 timj Exp $
 
 =head1 METHODS
 
@@ -158,19 +159,22 @@ sub configure {
      # read.  If there isn't one specified, then we should read each of the
      # extensions that exist in the file, if in fact there are any.
 
-     my $ext;
-     fits_parse_extnum($args{File},$ext,$status);
-     my @subfrms = ();
-     if ($ext == -99) {
+     if ( exists $args{File} )
+     {
+       my $ext;
+       fits_parse_extnum($args{File},$ext,$status);
+       my @subfrms = ();
+       if ($ext == -99) {
          my $nhdus;
          $ifits->get_num_hdus($nhdus,$status);
          foreach my $ihdu (1 .. $nhdus-1) {
-             my $subfr = sprintf("%s[%d]",$args{File},$ihdu);
-             my $sself = $self->new(File=>$subfr);
-             push @subfrms,$sself;
+	   my $subfr = sprintf("%s[%d]",$args{File},$ihdu);
+	   my $sself = $self->new(File=>$subfr);
+	   push @subfrms,$sself;
          }
+       }
+       $self->subhdrs(@subfrms);
      }
-     $self->subhdrs(@subfrms);
   }
  
   # clean up
@@ -276,7 +280,7 @@ Jim Lewis E<lt>jrl@ast.cam.ac.ukE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council.
+Copyright (C) 2001-2006 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify

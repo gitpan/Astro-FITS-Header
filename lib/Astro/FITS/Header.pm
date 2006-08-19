@@ -22,12 +22,13 @@ package Astro::FITS::Header;
 #    Tim Jenness (t.jenness@jach.hawaii.edu)
 #    Craig DeForest (deforest@boulder.swri.edu)
 #    Jim Lewis (jrl@ast.cam.ac.uk)
+#    Brad Cavanagh (b.cavanagh@jach.hawaii.edu)
 
 #  Revision:
-#     $Id: Header.pm,v 1.26 2003/10/23 03:28:28 bradc Exp $
+#     $Id: Header.pm,v 3.0 2006/08/19 00:09:06 timj Exp $
 
 #  Copyright:
-#     Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council. 
+#     Copyright (C) 2001-2005 Particle Physics and Astronomy Research Council.
 #     Portions copyright (C) 2002 Southwest Research Institute
 #     All Rights Reserved.
 
@@ -55,10 +56,11 @@ of FITS header cards as input.
 
 use strict;
 use vars qw/ $VERSION /;
+use Carp;
 
 use Astro::FITS::Header::Item;
 
-'$Revision: 1.26 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
 
 # Operator overloads
 use overload '""' => "stringify",
@@ -68,7 +70,7 @@ use overload '""' => "stringify",
 
 =head1 REVISION
 
-$Id: Header.pm,v 1.26 2003/10/23 03:28:28 bradc Exp $
+$Id: Header.pm,v 3.0 2006/08/19 00:09:06 timj Exp $
 
 =head1 METHODS
 
@@ -116,7 +118,7 @@ sub new {
 
 =over 4
 
-=item B<tieRetRef>
+=item B<tiereturnsref>
 
 Indicates whether the tied object should return multiple values
 as a single string joined by newline characters (false) or 
@@ -142,10 +144,18 @@ sub tiereturnsref {
 
 =item B<subhdrs>
 
-Set or return the subheaders for a Header object
+Set or return the subheaders for a Header object. Arguments must be
+given as C<Astro::FITS::Header> objects.
 
     $header->subhdrs(@hdrs);
     @hdrs = $header->subhdrs;
+
+This method should be used when you have additional header components
+that should be associated with the primary header but they are not
+associated with a particular name, just an ordering.
+
+FITS headers that are associated with a name can be stored directly
+in the header using an C<Astro::FITS::Header::Item> of type 'HEADER'.
 
 =cut
 
@@ -153,6 +163,15 @@ sub subhdrs {
     my $self = shift;
 
     if (@_) {
+        # verify the class
+        my $i;
+        for my $h (@_) {
+	  croak "Argument $i supplied to subhdrs method is not a Astro::FITS::Header object\n"
+	    unless UNIVERSAL::isa( $h, "Astro::FITS::Header" );
+          $i++;
+        }
+
+        # store them
         @{$self->{SUBHDRS}} = @_;
     }
     if (wantarray()) {
@@ -180,6 +199,30 @@ sub item {
    # grab and return the Header::Item at $index
    return ${$self->{HEADER}}[$index];
 }
+
+
+=item B<get_wcs>
+
+Returns a Starlink::AST FrameSet object representing the WCS of the
+FITS Header. 
+
+   $ast = $header->get_wcs();
+
+=cut
+
+sub get_wcs {
+   my $self = shift;
+
+   require Starlink::AST;
+   my $fchan = Starlink::AST::FitsChan->new();
+   for my $i ( $self->cards() ) {
+      $fchan->PutFits( $i, 0);
+   }
+   $fchan->Clear( "Card" );
+   return $fchan->Read();
+   
+}
+
 
 # K E Y W O R D ------------------------------------------------------------
 
@@ -221,6 +264,34 @@ sub itembyname {
    my ( $self, $keyword ) = @_;
 
    my @items = @{$self->{HEADER}}[$self->index($keyword)];
+
+   return wantarray ?  @items : @items ? $items[0] : undef;
+
+}
+
+# I T E M   B Y   T Y P E  -------------------------------------------------
+
+=item B<itembytype>
+
+Returns an array of Header::Items for the requested type if called in
+list context, or the first matching Header::Item if called in scalar
+context. See C<Astro::FITS::Header::Item> for a list of allowed types.
+
+   @items = $header->itembytype( "COMMENT" );
+   @items = $header->itembytype( "HEADER" );
+   $item = $header->itembytype( "INT" );
+
+=cut
+
+sub itembytype {
+   my ( $self, $type ) = @_;
+
+   return () unless defined $type;
+
+   $type = uc($type);
+
+   # No optimised lookup so brute force it
+   my @items = grep { $_->type eq $type } @{ $self->{HEADER} };
 
    return wantarray ?  @items : @items ? $items[0] : undef;
 
@@ -313,11 +384,11 @@ C<undef> if the keyword does not exist.
 
 sub comment {
    my ( $self, $keyword ) = @_;
-      
+
    # resolve the comments from the index array from lookup table
    my @comments =
      map { ${$self->{HEADER}}[$_]->comment() } $self->index($keyword);
-   
+
    # loop over the indices and grab the comments
    return wantarray ?  @comments : @comments ? $comments[0] : undef;
 }
@@ -334,25 +405,18 @@ the object $item is not copied, multiple inserts of the same object mean
 that future modifications to the one instance of the inserted object will
 modify all inserted copies.
 
+The insert position can be negative.
+
 =cut
 
 sub insert{
    my ($self, $index, $item) = @_;
 
-   # If the array is empty and we get a negative index we
-   # must convert it to an index of 0 to prevent a:
-   #   Modification of non-creatable array value attempted, subscript -1
-   # fatal error
-   # This can occur with a tied hash and the %{$tieref} = %new
-   # construct
-   $index = 0 if (scalar(@{$self->{HEADER}} == 0 && $index < 0));
-
    # splice the new FITS header card into the array
-   splice @{$self->{HEADER}}, $index, 0, $item;
+   # Splice automatically triggers a lookup table rebuild
+   $self->splice($index, 0, $item);
 
-   # rebuild the lookup table from the modified header
-   $self->_rebuild_lookup();
-
+   return;
 }
 
 
@@ -370,18 +434,11 @@ returns the replaced card.
 
 sub replace{
    my ($self, $index, $item) = @_;
-
    # remove the specified item and replace with $item
-   my @cards = splice @{$self->{HEADER}}, $index, 1, $item;
-   
-   # rebuild the lookup table from the modified header
-   $self->_rebuild_lookup();
-   
-   # return removed items
-   return wantarray ? @cards : $cards[scalar(@cards)-1];
-   
-} 
- 
+   # Splice triggers a rebuild so we do not have to
+   return $self->splice( $index, 1, $item);
+}
+
 # R E M O V E -------------------------------------------------------------
 
 =item B<remove>
@@ -396,17 +453,10 @@ returns the removed card.
 
 sub remove{
    my ($self, $index) = @_;
-   
    # remove the  FITS header card from the array
-   my @cards = splice @{$self->{HEADER}}, $index, 1;
-   
-   # rebuild the lookup table from the modified header
-   $self->_rebuild_lookup();
-   
-   # return removed items
-   return wantarray ? @cards : $cards[scalar(@cards)-1];
-   
-} 
+   # Splice always triggers a lookup table rebuild so we don't have to
+   return $self->splice( $index, 1);
+}
 
 # R E P L A C E  B Y  N A M E ---------------------------------------------
 
@@ -414,7 +464,7 @@ sub remove{
 
 Replace FITS header cards with keyword $keyword with card $item
 
-   $card = $header->replacebyname($keyword, $item);  
+   $card = $header->replacebyname($keyword, $item);
 
 returns the replaced card. The keyword may be a regular expression
 created with the C<qr> operator.
@@ -423,15 +473,17 @@ created with the C<qr> operator.
 
 sub replacebyname{
    my ($self, $keyword, $item) = @_;
-   
+
    # grab the index array from lookup table
    my @index = $self->index($keyword);
 
    # loop over the keywords
+   # We use a real splice rather than the class splice for efficiency
+   # in order to prevent an index rebuild for each index
    my @cards = map { splice @{$self->{HEADER}}, $_, 1, $item;} @index;
 
-   # rebuild the lookup table from the modified header
-   $self->_rebuild_lookup();
+   # force rebuild
+   $self->_rebuild_lookup;
 
    # return removed items
    return wantarray ? @cards : $cards[scalar(@cards)-1];
@@ -453,20 +505,21 @@ created with the C<qr> operator.
 
 sub removebyname{
    my ($self, $keyword) = @_;
-   
+
    # grab the index array from lookup table
    my @index = $self->index($keyword);
 
    # loop over the keywords
+   # We use a real splice rather than the class splice for efficiency
+   # in order to prevent an index rebuild for each index
    my @cards = map { splice @{$self->{HEADER}}, $_, 1; } @index;
 
-   # rebuild the lookup table from the modified header
-   $self->_rebuild_lookup();
-   
+   # force rebuild
+   $self->_rebuild_lookup;
+
    # return removed items
    return wantarray ? @cards : $cards[scalar(@cards)-1];
-   
-} 
+}
 
 # S P L I C E --------------------------------------------------------------
 
@@ -486,34 +539,44 @@ is negative, counts from the end of the FITS header.
 
 sub splice {
    my $self = shift;
-   
-   # check for arguments
-   my @cards;
-   
-   if ( scalar(@_) == 0 ) {
-      # none
-      @cards = splice @{$self->{HEADER}};
-      $self->_rebuild_lookup();
-      return wantarray ? @cards : $cards[scalar(@cards)-1];
-   } elsif ( scalar(@_) == 1 ) {
-      # $offset
-      my ( $offset ) = @_;
-      @cards = splice @{$self->{HEADER}}, $offset;          
-      $self->_rebuild_lookup();
-      return wantarray ? @cards : $cards[scalar(@cards)-1];
-   } elsif ( scalar(@_) == 2 ) {
-      # $offset and $length
-      my ( $offset, $length ) = @_;
-      @cards = splice @{$self->{HEADER}}, $offset, $length;
-      $self->_rebuild_lookup();
-      return wantarray ? @cards : $cards[scalar(@cards)-1];
-   } else {
-      # $offset, $length and @list 
-      my ( $offset, $length, @list ) = @_;
-      @cards = splice @{$self->{HEADER}}, $offset, $length;	
-      $self->_rebuild_lookup();
-      return wantarray ? @cards : $cards[scalar(@cards)-1];
+   my ($offset, $length, @list) = @_;
+
+   # If the array is empty and we get a negative offset we
+   # must convert it to an offset of 0 to prevent a:
+   #   Modification of non-creatable array value attempted, subscript -1
+   # fatal error
+   # This can occur with a tied hash and the %{$tieref} = %new
+   # construct
+   if (defined $offset) {
+     $offset = 0 if (@{$self->{HEADER}} == 0 && $offset < 0);
    }
+
+   # the removed cards
+   my @cards;
+
+   if (@list) {
+     # all arguments supplied
+     for my $i (@list) {
+       croak "Arguments to splice must be Astro::FITS::Header::Item objects"
+         unless UNIVERSAL::isa($i, "Astro::FITS::Header::Item");	
+     }
+     @cards = splice @{$self->{HEADER}}, $offset, $length, @list;
+
+   } elsif (defined $length) {
+     # length and (presumably) offset
+     @cards = splice @{$self->{HEADER}}, $offset, $length;
+
+   } elsif (defined $offset) {
+     # offset only
+     @cards = splice @{$self->{HEADER}}, $offset;
+   } else {
+     # none
+     @cards = splice @{$self->{HEADER}};
+   }
+
+   # update the internal lookup table and return
+   $self->_rebuild_lookup();
+   return wantarray ? @cards : $cards[scalar(@cards)-1];
 }
 
 # C A R D S --------------------------------------------------------------
@@ -529,6 +592,20 @@ Return the object contents as an array of FITS cards.
 sub cards {
   my $self = shift;
   return map { "$_" } @{$self->{HEADER}};
+}
+
+=item B<sizeof>
+
+Returns the highest index in use in the FITS header.
+To get the total number of header items, add 1.
+
+  $number = $header->sizeof;
+
+=cut
+
+sub sizeof {
+  my $self = shift;
+  return $#{$self->{HEADER}};
 }
 
 # A L L I T E M S ---------------------------------------------------------
@@ -599,6 +676,159 @@ sub configure {
 	$self->_rebuild_lookup; 
     }
 }
+
+=item B<merge_primary>
+
+Given the current header and a set of C<Astro::FITS::Header> objects,
+return a merged FITS header (with the cards that have the same value
+and comment across all headers) along with, for each input, header
+objects containing all the header items that differ (including, by
+default, keys that are not present in all headers). Only the primary
+headers are merged, subheaders are ignored.
+
+ ($clone) = $headerr->merge_primary();
+ ($same, @different) = $header->merge_primary( $fits1, $fits2, ...);
+ ($same, @different) = $header->merge_primary( \%options, $fits1, $fits2 );
+
+@different can be empty if all headers match (but see the
+C<force_return_diffs> option) but if any headers are different there
+will always be the same number of headers in @different as supplied to
+the function (including the reference header). A clone of the input header
+(stripped of any subheaders) is returned if no comparison headers are
+supplied.
+
+In scalar context, just returns the merged header.
+
+  $merged = $header->merge_primary( @hdrs );
+
+The options hash is itself optional. It contains the following keys:
+
+ merge_unique - if an item is identical across multiple headers and only
+                exists in those headers, propogate to the merged header rather
+                than storing it in the difference headers.
+
+ force_return_diffs - return an empty difference object per input header
+                      even if there are no diffs
+
+=cut
+
+sub merge_primary {
+  my $self = shift;
+
+  # optional options handling
+  my %opt = ( merge_unique => 0,
+	      force_return_diffs => 0,
+	    );
+  if (ref($_[0]) eq 'HASH') {
+    my $o = shift;
+    %opt = ( %opt, %$o );
+  }
+
+  # everything else is fits headers
+  # If we do not get any additional headers we still process the full header
+  # rather than shortcircuiting the logic. This is so that we can strip
+  # HEADER items without having to write duplicate logic. Clearly not
+  # very efficient but we do not really expect people to use this method
+  # to clone a FITS header....
+  my @fits = @_;
+
+  # Number of output diff arrays
+  # Include this object
+  my $nhdr = @fits + 1;
+
+  # Go through all the items building up a hash indexed
+  # by KEYWORD pointing to an array of items with that keyword
+  # and an array of unique keywords in the original order they 
+  # appeared first. COMMENT and UNDEF items are stored in the 
+  # hash as complete cards.
+  # HEADER items are currently dropped on the floor.
+  my @order;
+  my %items;
+  my $hnum = 0;
+  for my $hdr ($self, @fits) {
+    for my $item ($hdr->allitems) {
+      my $key;
+      my $type = $item->type;
+      if ($type eq 'COMMENT' || $type eq 'UNDEF') {
+	$key = $item->card;
+      } elsif ($type eq 'HEADER') {
+	next;
+      } else {
+	$key = $item->keyword;
+      }
+
+      if (exists $items{$key}) {
+	# Store the item, but in a hash with key corresponding
+	# to the input header number
+	push( @{ $items{$key}}, { item => $item, hnum => $hnum } );
+      } else {
+	$items{$key} = [ { item => $item, hnum => $hnum } ];
+	push(@order, $key);
+      }
+    }
+    $hnum++;
+  }
+
+  # create merged and difference arrays
+  my @merged;
+  my @difference = map { [] } (1..$nhdr);
+
+  # Now loop over all of the unique keywords (taking care to
+  # spot comments)
+  for my $key (@order) {
+    my @items = @{$items{$key}};
+
+    # compare each Item with the first. This will work even if we only have
+    # one Item in the array.
+    # Note that $match == 1 to start with because it always matches itself
+    # but we do not bother doing the with-itself comparison.
+    my $match = 1;
+    for my $i (@items[1..$#items]) {
+      # Ask the Items to compare using the equals() method
+      if ($items[0]->{item}->equals( $i->{item} )) {
+	$match++;
+      }
+    }
+
+    # if we matched all the items and are merging unique OR if we
+    # matched all the items and that was all the available headers
+    # we store in the merged array. Else we store in the differences
+    # array
+    if ($match == @items && ($match == $nhdr || $opt{merge_unique})) {
+      # Matched all the headers or merging matching unique headers
+      # only need to store one
+      push(@merged, $items[0]->{item});
+
+    } else {
+      # Not enough of the items matched. Store to the relevant difference
+      # arrays.
+      for my $i (@items) {
+	push(@{ $difference[$i->{hnum}] }, $i->{item});
+      }
+
+    }
+
+  }
+
+  # and clear @difference in the special case where none have any headers
+  if (!$opt{force_return_diffs}) {
+    @difference = () unless grep { @$_ != 0 } @difference;
+  }
+
+  # unshift @merged onto the front of @difference in preparation
+  # for returning it
+  unshift(@difference, \@merged );
+
+  # convert back to FITS object, making sure we stringify the Item
+  # objects so that we retain copies
+  for my $d (@difference) {
+    $d = $self->new( Cards => [ map { "$_" } @$d ]);
+  }
+
+  # remembering that the merged array is on the front
+  return (wantarray ? @difference : $difference[0]);
+}
+
 =item B<freeze>
 
 Method to return a blessed reference to the object so that we can store
@@ -749,7 +979,7 @@ string.  Extra-long string values are handled gracefully: they get
 split among multiple cards, with a backslash at the end of each card
 image.  They're transparently reassembled when you access the data, so
 that there is a strong analogy between multiline string values and multiple
-cards.  
+cards.
 
 In general, appending to hash entries that look like strings does what
 you think it should.  In particular, comment cards have a newline
@@ -814,21 +1044,27 @@ force string evaluation, feed in a trivial array ref:
   $hash{ALPHA} = "T";      # generates a LOGICAL card containing T. 
   $hash{ALPHA} = ["T"];    # generates a STRING card containing "T".
 
-Calls to keys() or each() will, by default, return the keywords in the order 
-n which they appear in the header.
+Calls to keys() or each() will, by default, return the keywords in the order
+in which they appear in the header.
 
-When the key refers to a subheader entry, a hash reference is returned.
-If a hash reference is stored in a value it is converted to a
-C<Astro::FITS::Header> object.
+=head2 Sub-headers
+
+When the key refers to a subheader entry (ie an item of type
+"HEADER"), a hash reference is returned.  If a hash reference is
+stored in a value it is converted to a C<Astro::FITS::Header> object.
+
+If the special key "SUBHEADERS" is used, it will return the array of
+subheaders, (as stored using the C<subhdrs> method) each of which will
+be tied to a hash. Subheaders can be stored using normal array operations.
 
 =head2 SIMPLE and END cards
 
-No FITS interface would becomplete without special cases.  
- 
+No FITS interface would becomplete without special cases.
+
 When you assign to SIMPLE or END, the tied interface ensures that they
 are first or last, respectively, in the deck -- as the FITS standard
 requires.  Other cards are inserted in between the first and last
-elements, in the order that you define them.  
+elements, in the order that you define them.
 
 The SIMPLE card is forced to FITS LOGICAL (boolean) type.  The FITS
 standard forbids you from setting it to F, but you can if you want --
@@ -879,25 +1115,38 @@ sub FETCH {
 
   $key = uc($key);
 
+  # if the key is called SUBHEADERS we should tie to an array
+  if ($key eq 'SUBHEADERS') {
+    my @dummy;
+    tie @dummy, "Astro::FITS::HeaderCollection", scalar $self->subhdrs;
+    return \@dummy;
+  }
+
   # If the key has a _COMMENT suffix we are looking for a comment
   my $wantvalue = 1;
+  my $wantcomment = 0;
   if ($key =~ /_COMMENT$/) {
     $wantvalue = 0;
+    $wantcomment = 1;
     # Remove suffix
     $key =~ s/_COMMENT$//;
   }
 
-  # if we are of type COMMENT we want to retrieve the comment regardless
-  # We find this by getting the first item that matches
-  my $item = ($self->itembyname($key))[0];
-  my $t_ok = (defined $item) && (defined $item->type);
-  $wantvalue = 0 if ($t_ok && ($item->type eq 'COMMENT'));
+  # if we are of type COMMENT we want to retrieve the comment only
+  # if they're asking for $key_COMMENT.
+  my $item;
+  my $t_ok;
+  if( $wantcomment || $key =~ /^COMMENT$/ || $key =~ /^END$/) {
+    $item = ($self->itembyname($key))[0];
+    $t_ok = (defined $item) && (defined $item->type);
+    $wantvalue = 0 if ($t_ok && ($item->type eq 'COMMENT'));
+  }
 
   # The END card is a special case.  We always return " " for the value,
   # and undef for the comment.
   return ($wantvalue ? " " : undef)
-      if( ($t_ok && ($item->type eq 'END')) || 
-	  ((defined $item) && ($key eq 'END')) );
+    if( ($t_ok && ($item->type eq 'END')) ||
+        ((defined $item) && ($key eq 'END')) );
 
   # Retrieve all the values/comments. Note that we go through the entire
   # header for this in case of multiple matches
@@ -1044,7 +1293,7 @@ sub STORE {
       @val = @$value;
 
     } elsif (ref $value) {
-      die "Can't put non-array ref values into a tied FITS header\n";
+      croak "Can't put non-array ref values into a tied FITS header\n";
 
     } elsif( $value =~ m/\n/s ) {
       @val = split("\n",$value);
@@ -1162,9 +1411,25 @@ sub STORE {
 
 
 # reports whether a key is present in the hash
+# SUBHEADERS only exist if there are subheaders
 sub EXISTS {
   my ($self, $keyword) = @_;
-  return undef unless exists ${$self->{LOOKUP}}{$keyword};
+  $keyword = uc($keyword);
+
+  if ($keyword eq 'SUBHEADERS') {
+    return ( scalar(@{$self->subhdrs}) > 0 ? 1 : 0);
+  }
+
+  if( !exists( ${$self->{LOOKUP}}{$keyword} ) ) {
+    return undef;
+  }
+  if(  exists( ${$self->{LOOKUP}}{$keyword} ) &&
+      ${$self->{HEADER}}[${$self->{LOOKUP}}{$keyword}[0]]->type eq 'COMMENT' ) {
+    return undef;
+  }
+
+  return 1;
+
 }
 
 # deletes a key and value pair
@@ -1194,7 +1459,17 @@ sub FIRSTKEY {
 # implements keys() and each()
 sub NEXTKEY {
   my ($self, $keyword) = @_; 
-  return undef if $self->{LASTKEY}+1 == scalar(@{$self->{HEADER}}) ;
+
+  # abort if the number of keys we have served equals the number in the
+  # header array. One wrinkle is that if we have SUBHDRS we want to go
+  # rount one more time
+  if ($self->{LASTKEY}+1 == scalar(@{$self->{HEADER}})) {
+    if (scalar(@{ $self->subhdrs}) && !$self->{SEENKEY}->{SUBHEADERS}) {
+      $self->{SEENKEY}->{SUBHEADERS} = 1;
+      return "SUBHEADERS";
+    }
+    return undef
+  }
 
   # Skip later lines of multi-line cards...
   my($a);
@@ -1214,9 +1489,14 @@ sub NEXTKEY {
 
 # T I M E   A T   T H E   B A R  --------------------------------------------
 
+=head1 SEE ALSO
+
+C<Astro::FITS::Header::Item>, C<Starlink::AST>,
+C<Astro::FITS::Header::CFITSIO>, C<Astro::FITS::Header::Item::NDF>.
+
 =head1 COPYRIGHT
 
-Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council
+Copyright (C) 2001-2005 Particle Physics and Astronomy Research Council
 and portions Copyright (C) 2002 Southwest Research Institute.
 All Rights Reserved.
 
@@ -1228,9 +1508,160 @@ it under the same terms as Perl itself.
 Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>,
 Tim Jenness E<lt>t.jenness@jach.hawaii.eduE<gt>,
 Craig DeForest E<lt>deforest@boulder.swri.eduE<gt>,
-Jim Lewis E<lt>jrl@ast.cam.ac.ukE<gt>
+Jim Lewis E<lt>jrl@ast.cam.ac.ukE<gt>,
+Brad Cavanagh E<lt>b.cavanagh@jach.hawaii.eduE<gt>
+
 
 =cut
+
+package Astro::FITS::HeaderCollection;
+
+use 5.006;
+use warnings;
+use strict;
+use Carp;
+
+# Class wrapper for subhdrs tie. Not (yet) a public interface
+# we simply need a class that we can tie the subhdrs array to.
+
+sub TIEARRAY {
+  my ($class, $container) = @_;
+  # create an object, but we want to avoid blessing the actual
+  # array into this class
+  return bless { SUBHDRS => $container }, $class;
+}
+
+# must return a new tie
+sub FETCH {
+  my $self = shift;
+  my $index = shift;
+
+  my $arr = $self->{SUBHDRS};
+  if ( $index >= 0 && $index <= $#$arr ) {
+    return $self->_hdr_to_tie( $arr->[$index] );
+  } else {
+    return undef;
+  }
+}
+
+sub STORE {
+  my $self = shift;
+  my $index = shift;
+  my $value = shift;
+
+  my $hdr = $self->_tie_to_hdr( $value );
+  $self->{SUBHDRS}->[$index] = $hdr;
+}
+
+sub FETCHSIZE {
+  my $self = shift;
+  return scalar( @{ $self->{SUBHDRS} });
+}
+
+sub STORESIZE {
+  croak "Tied STORESIZE for SUBHDRS not yet implemented\n";
+}
+
+sub EXTEND {
+
+}
+
+sub EXISTS {
+  my $self = shift;
+  my $index = shift;
+  my $arr = $self->{SUBHDRS};
+
+  return 0 if $index > $#$arr || $index < 0;
+  return 1 if defined $self->{SUBHDRS}->[$index];
+  return 0;
+}
+
+sub DELETE {
+  my $self = shift;
+  my $index = shift;
+  $self->{SUBHDRS}->[$index] = undef;
+}
+
+sub CLEAR {
+  my $self = shift;
+  @{ $self->{SUBHDRS} } = ();
+}
+
+sub PUSH {
+  my $self = shift;
+  my @list = @_;
+
+  # convert
+  @list = map { $self->_tie_to_hdr($_) } @list;
+  push(@{ $self->{SUBHDRS} }, @list);
+}
+
+sub POP {
+  my $self = shift;
+  my $popped = pop( @{ $self->{SUBHDRS} } );
+  return $self->_hdr_to_tie($popped);
+}
+
+sub SHIFT {
+  my $self = shift;
+  my $shifted = shift( @{ $self->{SUBHDRS} } );
+  return $self->_hdr_to_tie($shifted);
+}
+
+sub UNSHIFT {
+  my $self = shift;
+  my @list = @_;
+
+  # convert
+  @list = map { $self->_tie_to_hdr($_) } @list;
+  unshift(@{ $self->{SUBHDRS} }, @list);
+
+}
+
+# internal mappings
+
+# Given an Astro::FITS::Header object, return the thing that 
+# should be returned to the user of the tie
+sub _hdr_to_tie {
+  my $self = shift;
+  my $hdr = shift;
+
+  if (defined $hdr) {
+    my %header;
+    tie %header, ref($hdr), $hdr;
+    return \%header;
+  }
+  print "UNDEF\n";
+  return undef;
+}
+
+# convert an input argument as either a Astro::FITS::Header object
+# or a hash, to an internal representation (an A:F:H object)
+sub _tie_to_hdr {
+  my $self = shift;
+  my $value = shift;
+
+  if (UNIVERSAL::isa($value, "Astro::FITS::Header")) {
+    return $value;
+  } elsif (ref($value) eq 'HASH') {
+    my $tied = tied %$value;
+    if (defined $tied && UNIVERSAL::isa($tied, "Astro::FITS::Header")) {
+      # Just take the object
+      return $tied;
+    } else {
+      # Convert it to a hash
+      my @items = map { new Astro::FITS::Header::Item( Keyword => $_,
+                                                       Value => $value->{$_}
+                                                     ) } keys (%{$value});
+
+      # Create the Header object.
+      return new Astro::FITS::Header( Cards => \@items );
+
+    }
+  } else {
+    croak "Do not know how to store '$value' in a SUBHEADER\n";
+  }
+}
 
 # L A S T  O R D E R S ------------------------------------------------------
 

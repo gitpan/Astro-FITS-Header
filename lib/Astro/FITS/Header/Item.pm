@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-'$Revision: 1.18 $ ' =~ /.*:\s(.*)\s\$/ && ($VERSION = $1);
+$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
 
 =head1 METHODS
 
@@ -177,18 +177,26 @@ the FITS card.
   $type = $item->type();
   $item->type( "INT" );
 
-Allowed types are "LOGICAL", "INT", "FLOAT", "STRING", "COMMENT"
-and "UNDEF".
+Allowed types are "LOGICAL", "INT", "FLOAT", "STRING", "COMMENT",
+"HEADER" and "UNDEF".
 
-A special type, "HEADER", is used to specify that this item refers
-to a subsidiary header (eg a header in an MEFITS file or a header
-in an NDF in an HDS container).
+The special type, "HEADER", is used to specify that this item refers to
+a subsidiary header (eg a header in an MEFITS file or a header in an
+NDF in an HDS container). See also the C<subhdrs> method in
+C<Astro::FITS::Header> for an alternative way of specifying a
+sub-header.
+
+The type is case-insensitive, but will always be returned up-cased.
 
 =cut
 
 sub type {
   my $self = shift;
-  if (@_) { $self->{Type} = shift;  }
+  if (@_) { 
+    my $type = shift;
+    $type = uc($type) if defined $type;
+    $self->{Type} = $type;
+  }
   return $self->{Type};
 }
 
@@ -267,7 +275,7 @@ Configures the object from multiple pieces of information.
 
 Takes a hash as argument with the following keywords:
 
-=over 4
+=over 8
 
 =item B<Card>
 
@@ -375,6 +383,10 @@ sub parse_card {
   my $card = shift;
   my $equals_col = 8;
 
+  # Remove new line and pad card to 80 characters
+  chomp($card);
+#  $card = sprintf("%-80s", $card);
+
   # Value is only present if an = is found in position 9
   my ($value, $comment) = ('', '');
   my $keyword = uc(substr($card, 0, $equals_col));
@@ -403,9 +415,16 @@ sub parse_card {
     return("END", undef, undef);
   }
 
-  return () if length($card) == 0;
+  # This will be a blank line but will not trigger here if we
+  # are padding to 80 characters
+  if (length($card) == 0) {
+    $self->type( "UNDEF" );
+    return( "", undef, undef);
+  }
 
   # Check for comment or HISTORY
+  # If the card is not padded this may trigger a warning on the
+  # substr going out of bounds
   if ($keyword eq 'COMMENT' || $keyword eq 'HISTORY' ||
       (substr($card,8,2) ne "= " && $keyword !~ /^HIERARCH/)) {
 
@@ -413,9 +432,13 @@ sub parse_card {
     $self->type( "COMMENT" );
 
     # We have comments
-    $comment = substr($card,8);
-    $comment =~ s/\s+$//;  # Trailing spaces
-
+    unless ( length( $card) <= 8 ) {
+       $comment = substr($card,8);
+       $comment =~ s/\s+$//;  # Trailing spaces
+    } else {
+       $comment = "";
+    }
+    
     # Alasdair wanted to store this as a value
     $self->comment( $comment );
 
@@ -571,6 +594,86 @@ sub parse_card {
 
 }
 
+=item B<equals>
+
+Compares this Item with another and returns true if the keyword,
+value, type and comment are all equal.
+
+  $isident = $item->equals( $item2 );
+
+=cut
+
+sub equals {
+  my $self = shift;
+  my $ref = shift;
+
+  # Loop over the string keywords
+  for my $method (qw/ keyword type comment /) {
+    my $val1 = $self->$method;
+    my $val2 = $ref->$method;
+
+    if (defined $val1 && defined $val2) {
+      # These are all string comparisons
+      if ($val1 ne $val2) {
+	return 0;
+      }
+    } elsif (!defined $val1 && !defined $val2) {
+      # both undef so equal
+    } else {
+      # one undef, the other defined
+      return 0;
+    }
+  }
+
+  # value comparison will depend on type
+  # we know the types are the same
+  my $val1 = $self->value;
+  my $val2 = $ref->value;
+  my $type = $self->type;
+
+  return 0 if ((defined $val1 && !defined $val2) ||
+	       (defined $val2 && !defined $val1));
+  return 1 if (!defined $val1 && !defined $val2);
+
+  if ($type eq 'FLOAT' || $type eq 'INT') {
+    return ( $val1 == $val2 );
+  } elsif ($type eq 'STRING') {
+    return ( $val1 eq $val2 );
+  } elsif ($type eq 'LOGICAL') {
+    if (($val1 && $val2) || (!$val1 && !$val2)) {
+      return 1;
+    } else {
+      return 0;
+    }
+  } elsif ($type eq 'COMMENT') {
+    # if we get to here we have a defined value so we should
+    # check it even if COMMENT is meant to use COMMENT
+    return ($val1 eq $val2);
+
+  } elsif ($type eq 'HEADER') {
+    my @items1 = $val1->allitems;
+    my @items2 = $val2->allitems;
+
+    # count the items
+    return 0 if @items1 != @items2;
+
+    for my $i (0..$#items1) {
+      return 0 if ! $items1[$i]->equals( $items2[$i] );
+    }
+    return 1;
+
+  } elsif ($type eq 'UNDEF') {
+    # both are undef...
+    return 1;
+  } else {
+    croak "Unable to compare items of type '$type'\n";
+  }
+
+  # somehow we got to the end
+  return 0;
+}
+
+
 =begin __private
 
 =item B<_stringify>
@@ -696,6 +799,8 @@ sub _stringify {
       # Pad goes reverse way to a number
       $value = $value.(' 'x(20-length($value)));
 
+    } else {
+      carp("Type '$type' is not a recognized type. Header creation may be incorrect");
     }
 
     # Add the comment
@@ -720,9 +825,13 @@ sub _stringify {
 
 =back
 
+=head1 SEE ALSO
+
+C<Astro::FITS::Header>
+
 =head1 COPYRIGHT
 
-Copyright (C) 2001 Particle Physics and Astronomy Research Council.
+Copyright (C) 2001-2005 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify
@@ -735,5 +844,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 1.18 2003/07/02 16:25:03 allan Exp $
+#     $Id: Item.pm,v 3.0 2006/08/19 00:09:15 timj Exp $
 1;

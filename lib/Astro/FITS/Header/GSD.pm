@@ -33,7 +33,7 @@ use base qw/ Astro::FITS::Header /;
 
 use vars qw/ $VERSION /;
 
-$VERSION = '0.01';
+$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
 
 =head1 METHODS
 
@@ -104,12 +104,25 @@ sub configure {
 	$name = substr($name, 0, 8);
       }
 
+      # We need to convert the type from GSD to one that's a FITS
+      # type.
+      if( ( $type eq 'R' ) || ( $type eq 'D' ) ) {
+        $type = "FLOAT";
+      } elsif( ( $type eq 'I' ) || ( $type eq 'W' ) || ( $type eq 'B' ) ) {
+        $type = "INT";
+      } elsif( $type eq 'C' ) {
+        $type = "STRING";
+      } elsif( $type eq 'L' ) {
+        $type = "LOGICAL";
+      }
+
       # We do not have an actual FITS style string so we just
       # create the item directly
       push(@cards, new Astro::FITS::Header::Item(
 						 Keyword => $name,
 						 Comment => $comment,
 						 Value => $value,
+             Type => $type,
 						));
     }
 

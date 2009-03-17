@@ -1,4 +1,79 @@
-2006-08-18  Tim Jenness  <timj@jach.hawaii.edu>
+2009-03-16  Tim Jenness  <tjenness@cpan.org>
+
+	---- CPAN Version 3.01 -----
+
+2009-03-16 Craig DeForest <deforest@boulder.swri.edu>
+
+	* Header.pm (tied interface): make sure that HISTORY cards are
+	treated as comments by default (formerly only COMMENT cards
+	were treated as comments; therefore the {HISTORY} field was
+	comming up blank, requiring {HISTORY_COMMENT} instead.)
+
+2008-08-01  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header.pm (tie): Fix tie for subheaders if the last item in the FITS
+	header is a comment.
+
+2008-07-01  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header.pm (tie): Fix warnings when storing UNDEF value through tie.
+
+2008-04-07  Brad Cavanagh <b.cavanagh@jach.hawaii.edu>
+
+	* lib/Astro/FITS/Header/Item.pm (copy): Add a copy constructor. This is more reliable
+	than stringifying the header item and then using it in a Item constructor.
+
+2008-02-28  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header/NDF.pm (configure): Attempt to work around the fact that 
+	NDF can not read a file that includes a directory path with whitespace.
+
+2008-01-29  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header/NDF.pm (configure): It is no longer an
+	error If the NDF is perfectly valid but there is no FITS
+	extension,
+
+2008-01-24  Tim Jenness <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header/Item.pm (configure): Guess type if no type provided.
+
+2007-11-14  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header/AST.pm (configure): Allow the Encoding to be specified.
+
+2007-10-10  Brad Cavanagh <b.cavanagh@jach.hawaii.edu>
+
+	* lib/Astro/FITS/Header.pm (removebyname): Fix card removal when more than
+	one card matches the given regular expression.
+
+2007-07-30  Brad Cavanagh <b.cavanagh@jach.hawaii.edu>
+
+	* lib/Astro/FITS/Header.pm: Modifications to append() method: Do
+	not append SIMPLE card if requested to do so. Rebuild lookup table
+	after appending all cards, not after each card. If asked to append
+	a new header, do so before the END card, not after it, if the END
+	card exists. Fix bug when appending a card that exists in the
+	header but has an undefined value.
+
+2007-07-11  Brad Cavanagh <b.cavanagh@jach.hawaii.edu>
+
+	* lib/Astro/FITS/Header.pm: Add append() method to add new or
+	overwrite existing headers.
+
+2007-02-27  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header.pm: Hash constructor converts values with
+	newlines into multiple items. BLANK lines are skipped when merging.
+	
+	* lib/Astro/FITS/Header/Item.pm: Add BLANK item support and fix
+	some warnings associated with undef comments.
+
+2007-02-22  Tim Jenness  <tjenness@cpan.org>
+
+	* lib/Astro/FITS/Header.pm (configure): Add support for Hash constructor.
+
+2006-08-18  Tim Jenness  <tjenness@cpan.org>
 
         ---- CPAN Version 3.000 ----
 	

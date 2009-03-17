@@ -25,9 +25,10 @@ package Astro::FITS::Header::CFITSIO;
 #    Diab Jerius
 
 #  Revision:
-#     $Id: CFITSIO.pm,v 3.0 2006/08/19 00:09:14 timj Exp $
+#     $Id$
 
 #  Copyright:
+#     Copyright (C) 2007-2009 Science & Technology Facilities Council.
 #     Copyright (C) 2001-2006 Particle Physics and Astronomy Research Council. 
 #     All Rights Reserved.
 
@@ -70,13 +71,13 @@ use base qw/ Astro::FITS::Header /;
 use Astro::FITS::CFITSIO qw / :longnames :constants /;
 use Carp;
 
-$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = 3.01;
 
 # C O N S T R U C T O R ----------------------------------------------------
 
 =head1 REVISION
 
-$Id: CFITSIO.pm,v 3.0 2006/08/19 00:09:14 timj Exp $
+$Id$
 
 =head1 METHODS
 

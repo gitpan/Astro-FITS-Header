@@ -33,7 +33,7 @@ use base qw/ Astro::FITS::Header /;
 
 use vars qw/ $VERSION /;
 
-$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = 3.01;
 
 =head1 METHODS
 
@@ -169,6 +169,7 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =head1 COPYRIGHT
 
+Copyright (C) 2008-2009 Science & Technology Facilities Council.
 Copyright (C) 2001-2002 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 

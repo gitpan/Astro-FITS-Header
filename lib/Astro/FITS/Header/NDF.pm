@@ -37,13 +37,14 @@ Currently, subheader support is readonly.
 
 use strict;
 use Carp;
+use File::Spec;
 use NDF qw/ :ndf :dat :err :hds /;
 
 use base qw/ Astro::FITS::Header /;
 
 use vars qw/ $VERSION /;
 
-$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = 3.01;
 
 =head1 METHODS
 
@@ -66,6 +67,9 @@ layout of UKIRT (and some JCMT) data files). If an extension is specified
 explicitly (that is not ".sdf") that path is treated as an explicit path
 to an NDF. If an explicit path is specified no attempt is made to locate
 other NDFs in the HDS container.
+
+If the NDF can be opened successfully but there is no .MORE.FITS
+extension, an empty header is returned rather than throwing an error.
 
 =cut
 
@@ -101,6 +105,22 @@ sub configure {
     my $file = $args{File};
     $file =~ s/\.sdf$//;
 
+    # NDF currently (c.2008) has troubles with spaces in paths
+    # we work around this by changing to the directory before
+    # opening the file
+    my ($vol, $dir, $root) = File::Spec->splitpath( $file );
+    my $cwd;
+    if ($dir =~ /\s/) {
+      # only bother if there is a space
+      $cwd = File::Spec->rel2abs( File::Spec->curdir );
+      # if the chdir fails we will try to open the file
+      # with NDF anyway using the path. Otherwise we change the
+      # filename to be the root
+      if (chdir($dir)) {
+        $file = $root;
+      }
+    }
+      
     # Start NDF
     ndf_begin();
     $ndfstarted = 1;
@@ -121,25 +141,32 @@ sub configure {
 
       if ($status == $good) {
 
-	# If we have an NDF we can simply reopen it
-	# Additionally if we have no description of the component
-	# at all we assume NDF. This overcomes a bug in the acquisition
-	# for SCUBA where a blank type field is used.
-	my $ndffile;
-	if ($type =~ /NDF/i || $type !~ /\w/) {
-	  $ndffile = $file;
-	} else {
-	  # For now simply assume we can find a .HEADER
-	  # in future we could tweak this to default to first NDF
-	  # it finds if no .HEADER
-	  $ndffile = $file . ".HEADER";
-	}
+        # If we have an NDF we can simply reopen it
+        # Additionally if we have no description of the component
+        # at all we assume NDF. This overcomes a bug in the acquisition
+        # for SCUBA where a blank type field is used.
+        my $ndffile;
+        if ($type =~ /NDF/i || $type !~ /\w/) {
+          $ndffile = $file;
+        } else {
+          # For now simply assume we can find a .HEADER
+          # in future we could tweak this to default to first NDF
+          # it finds if no .HEADER
+          $ndffile = $file . ".HEADER";
+        }
 
-	# Close the HDS file
-	dat_annul( $hdsloc, $status);
+        # Close the HDS file
+        dat_annul( $hdsloc, $status);
 
-	# Open the NDF
-	ndf_find(&NDF::DAT__ROOT(), $ndffile, $indf, $status);
+        # Open the NDF
+        ndf_find(&NDF::DAT__ROOT(), $ndffile, $indf, $status);
+
+        # reset the directory
+        if (defined $cwd) {
+          chdir($cwd) or carp "Could not return to current working directory";
+        }
+
+
       }
     }
 
@@ -147,63 +174,73 @@ sub configure {
 
     $status = &NDF::SAI__ERROR;
     err_rep(' ',
-	    "$task: Argument hash does not contain ndfID, File or Cards",
-	   $status);
+            "$task: Argument hash does not contain ndfID, File or Cards",
+            $status);
 
   }
 
   if ($status == $good) {
 
-    # Find the FITS extension
-    ndf_xloc($indf, 'FITS', 'READ', my $xloc, $status);
+    # See if the extension exists
+    ndf_xstat( $indf, "FITS", my $there, $status);
 
-    if ($status == $good) {
+    if ($status == $good && $there) {
 
-      # Variables...
-      my (@dim, $ndim, $nfits, $maxdim);
-
-      # Get the dimensions of the FITS array
-      # Should only be one-dimensional
-      $maxdim = 7;
-      dat_shape($xloc, $maxdim, @dim, $ndim, $status);
+      # Find the FITS extension
+      ndf_xloc($indf, 'FITS', 'READ', my $xloc, $status);
 
       if ($status == $good) {
 
-        if ($ndim != 1) {
-          $status = &SAI__ERROR;
-          err_rep(' ',"$task: Dimensionality of FITS array should be 1 but is $ndim", $status);
+        # Variables...
+        my (@dim, $ndim, $nfits, $maxdim);
+
+        # Get the dimensions of the FITS array
+        # Should only be one-dimensional
+        $maxdim = 7;
+        dat_shape($xloc, $maxdim, @dim, $ndim, $status);
+
+        if ($status == $good) {
+
+          if ($ndim != 1) {
+            $status = &SAI__ERROR;
+            err_rep(' ',"$task: Dimensionality of FITS array should be 1 but is $ndim", $status);
+
+          }
 
         }
 
-      }
+        # Set the FITS array to empty
+        my @fits = ();     # Note that @fits only exists in this block
 
-      # Set the FITS array to empty
-      my @fits = ();   # Note that @fits only exists in this block
+        # Read the FITS extension
+        dat_get1c($xloc, $dim[0], @fits, $nfits, $status);
 
-      # Read the FITS extension
-      dat_get1c($xloc, $dim[0], @fits, $nfits, $status);
+        # Annul the locator
+        dat_annul($xloc, $status);
 
-      # Annul the locator
-      dat_annul($xloc, $status);
+        # Check status and read into hash
+        if ($status == $good) {
 
-      # Check status and read into hash
-      if ($status == $good) {
+          # Parse the FITS array
+          $self->SUPER::configure( Cards => \@fits );
 
-	# Parse the FITS array
-	$self->SUPER::configure( Cards => \@fits );
+        } else {
+
+          err_rep(' ',"$task: Error reading FITS array", $status);
+
+        }
 
       } else {
 
-        err_rep(' ',"$task: Error reading FITS array", $status);
-
+        # Add my own message to status
+        err_rep(' ', "$task: Error locating FITS extension",
+                $status);
       }
-
+    } elsif ($status != $good) {
+      err_rep(' ', "$task: Error determining presence of FITS extension",
+              $status);
     } else {
-
-      # Add my own message to status
-      err_rep(' ', "$task: Error locating FITS extension",
-             $status);
-
+      # simply is not there but file is okay
     }
 
     # Close the NDF identifier (if we opened it)
@@ -277,7 +314,7 @@ sub writehdr {
     $ndfstarted = 1;
 
     ndf_open(&NDF::DAT__ROOT(), $file, 'UPDATE', 'UNKNOWN',
-	     $ndfid, my $place, $status);
+             $ndfid, my $place, $status);
 
     # If status is bad, try assuming it is a HDS container
     # with UKIRT style .HEADER component
@@ -288,11 +325,11 @@ sub writehdr {
       my $useheader;
       err_mark();
       ndf_open(&NDF::DAT__ROOT(), $hdsfile, 'UPDATE', 'UNKNOWN',
-	       $ndfid, $place, $lstat);
+               $ndfid, $place, $lstat);
       if ($lstat != $good) {
-	err_annul( $lstat );
+        err_annul( $lstat );
       } else {
-	$useheader = 1;
+        $useheader = 1;
       }
       err_rlse();
 
@@ -373,6 +410,7 @@ Brad Cavanagh E<lt>b.cavanagh@jach.hawaii.eduE<gt>
 
 =head1 COPYRIGHT
 
+Copyright (C) 2008-2009 Science & Technology Facilities Council.
 Copyright (C) 2001-2005 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 

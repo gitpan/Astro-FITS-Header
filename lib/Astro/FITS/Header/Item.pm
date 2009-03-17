@@ -39,7 +39,7 @@ use overload (
 use vars qw/ $VERSION /;
 use Carp;
 
-$VERSION = sprintf("%d.%03d", q$Revision: 3.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = 3.01;
 
 =head1 METHODS
 
@@ -83,6 +83,20 @@ sub new {
   $item->configure( @_ ) if @_;
 
   return $item;
+}
+
+=item B<copy>
+
+Make a copy of an Astro::FITS::Header::Item object.
+
+  $newitem = $item->copy;
+
+=cut
+
+sub copy {
+  my $self = shift;
+  my %copy = %$self;
+  return bless \%copy, ref( $self );
 }
 
 =back
@@ -283,6 +297,9 @@ If supplied, the value is assumed to be a standard 80 character
 FITS header card. This is sent to the C<parse_card> method directly.
 Takes priority over any other key.
 
+If it is an C<Astro::FITS::Header::Item> it will be copied rather
+than parsed.
+
 =item B<Keyword>
 
 Used to specify the keyword associated with this object.
@@ -298,7 +315,8 @@ Used to specify the comment associated with this FITS item.
 =item B<Type>
 
 Used to specify the variable type. See the C<type> method
-for more details.
+for more details. A type will be guessed if one is not supplied.
+The guess may well be wrong.
 
 =back
 
@@ -311,7 +329,14 @@ sub configure {
   my %hash = @_;
 
   if (exists $hash{'Card'}) {
-    $self->parse_card( $hash{'Card'});
+    if (ref($hash{Card}) && $hash{Card}->isa("Astro::FITS::Header::Item")) {
+      # low level populate - can not use copy since we already have a copy
+      for my $k (keys %{$hash{Card}}) {
+        $self->{$k} = $hash{Card}->{$k};
+      }
+    } else {
+      $self->parse_card( $hash{'Card'});
+    }
   } else {
     # Loop over the allowed keys storing the values
     # in the object if they exist
@@ -319,8 +344,20 @@ sub configure {
       my $method = lc($key);
       $self->$method( $hash{$key}) if exists $hash{$key};
     }
-    # COMMENT, HISTORY, and blank cards are special
-    $self->type('COMMENT') if $self->keyword =~ /^(COMMENT|HISTORY|)$/;
+
+    # only set type if we have not been given a type
+    if (!$self->type) {
+      if (!$self->keyword && !$self->value) {
+	# completely blank
+	$self->type("BLANK");
+      } elsif (!$self->keyword || $self->keyword =~ /^(COMMENT|HISTORY)$/) {
+	# COMMENT, HISTORY, and blank cards are special
+	$self->type('COMMENT')
+      } else {
+        my $type = $self->guess_type( $self->value );
+        $self->type( $type ) if defined $type;
+      }
+    }
 
     # End cards are special, need only do a Keyword => 'END' to configure
     $self->type('END') if $self->keyword() eq 'END';
@@ -398,10 +435,10 @@ sub parse_card {
     $keyword = uc(substr($card, 0, $equals_col ));
   }
   # Remove leading and trailing spaces, and replace interior spaces
-  # between the keywords with a single 
+  # between the keywords with a single .
   $keyword =~ s/^\s+// if ( $card =~ /^\s+HIERARCH/ );
   $keyword =~ s/\s+$//;
-  $keyword =~ s/\s/./g;
+  $keyword =~ s/\s+/./g;
 
   # update object
   $self->keyword( $keyword );
@@ -418,10 +455,10 @@ sub parse_card {
   # This will be a blank line but will not trigger here if we
   # are padding to 80 characters
   if (length($card) == 0) {
-    $self->type( "UNDEF" );
-    return( "", undef, undef);
+    $self->type( "BLANK" );
+    return( undef, undef, undef);
   }
-
+  
   # Check for comment or HISTORY
   # If the card is not padded this may trigger a warning on the
   # substr going out of bounds
@@ -717,10 +754,12 @@ sub _stringify {
   if (defined $type && $type eq 'END' ) {
     $card = sprintf("%-10s%-70s", $card, "");
 
+  } elsif (defined $type && $type eq 'BLANK') {
+    $card = " " x 80;
   } elsif (defined $type && $type eq 'COMMENT') {
 
     # Comments are from character 9 - 80
-    $card = sprintf("%-8s%-72s", $card, $comment);
+    $card = sprintf("%-8s%-72s", $card, (defined $comment ? $comment : ''));
 
   } elsif (!defined $type && !defined $value && !defined $comment) {
 
@@ -736,15 +775,7 @@ sub _stringify {
     # tell the difference between 'F' and F
     # an undefined value is typeless
     unless (defined $type) {
-      if (!defined $value) {
-	$type = "UNDEF";
-      } elsif ($value =~ /^\d+$/) {
-	$type = "INT";
-      } elsif ($value =~ /^(-?)(\d*)(\.?)(\d*)([EeDd][-\+]?\d+)?$/) {
-	$type = "FLOAT";
-      } else {
-	$type = "STRING";
-      }
+      $type = $self->guess_type( $value );
     }
 
     # Numbers behave identically whether they are float or int
@@ -821,6 +852,35 @@ sub _stringify {
 
 }
 
+=item B<guess_type>
+
+This class method can be used to guess the data type of a supplied value.
+It is private but can be used by other classes in the Astro::FITS::Header
+hierarchy.
+
+ $type = Astro::FITS::Header::Item->guess_type( $value );
+
+Can not distinguish a string F from a LOGICAL F so will always guess
+"string". Returns "string" if a type could not be determined.
+
+=cut
+
+sub guess_type {
+  my $self = shift;
+  my $value = shift;
+  my $type;
+  if (!defined $value) {
+    $type = "UNDEF";
+  } elsif ($value =~ /^\d+$/) {
+    $type = "INT";
+  } elsif ($value =~ /^(-?)(\d*)(\.?)(\d*)([EeDd][-\+]?\d+)?$/) {
+    $type = "FLOAT";
+  } else {
+    $type = "STRING";
+  }
+  return $type;
+}
+
 =end __private
 
 =back
@@ -831,7 +891,8 @@ C<Astro::FITS::Header>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2001-2005 Particle Physics and Astronomy Research Council.
+Copyright (C) 2008-2009 Science and Technology Facilities Council.
+Copyright (C) 2001-2007 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify
@@ -844,5 +905,5 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id: Item.pm,v 3.0 2006/08/19 00:09:15 timj Exp $
+#     $Id$
 1;

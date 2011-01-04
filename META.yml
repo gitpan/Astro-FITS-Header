@@ -19,7 +19,7 @@ name: Astro-FITS-Header
 provides:
   Astro::FITS::Header:
     file: lib/Astro/FITS/Header.pm
-    version: 3.01
+    version: 3.03
   Astro::FITS::Header::AST:
     file: lib/Astro/FITS/Header/AST.pm
     version: 3.01
@@ -37,6 +37,7 @@ provides:
     version: 3.01
   Astro::FITS::HeaderCollection:
     file: lib/Astro/FITS/Header.pm
+    version: 3.01
 recommends:
   Astro::FITS::CFITSIO: 0
   Starlink::AST: 0
@@ -44,4 +45,4 @@ resources:
   homepage: http://github.com/timj/perl-Astro-FITS-Header/tree/master
   license: http://opensource.org/licenses/gpl-license.php
   repository: git://github.com/timj/perl-Astro-FITS-Header.git
-version: 3.02
+version: 3.03

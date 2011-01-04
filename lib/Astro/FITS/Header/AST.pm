@@ -16,10 +16,10 @@ Astro::FITS::Header::AST - Manipulates FITS headers from an AST object
 
 =head1 DESCRIPTION
 
-This module makes use of the L<Starlink::AST|Starlink::AST> module to read 
+This module makes use of the L<Starlink::AST|Starlink::AST> module to read
 the FITS HDU from an AST FrameSet object.
 
-It stores information about a FITS header block in an object. Takes an hash 
+It stores information about a FITS header block in an object. Takes an hash
 as an arguement, with an array reference pointing to an Starlink::AST
 FramSet object.
 
@@ -78,7 +78,7 @@ sub configure {
   # initialise the inherited status to OK.
   my $status = 0;
 
-  return $self->SUPER::configure(%args) 
+  return $self->SUPER::configure(%args)
     if exists $args{Cards} or exists $args{Items};
 
   # read the args hash
@@ -89,7 +89,7 @@ sub configure {
   my $wcsinfo = $args{FrameSet};
   my @cards;
   {
-     my $fchan = new Starlink::AST::FitsChan( 
+     my $fchan = new Starlink::AST::FitsChan(
                                       sink => sub { push @cards, $_[0] } );
      if (exists $args{Encoding}) {
        if (defined $args{Encoding}) {
@@ -126,12 +126,22 @@ Tim Jenness E<lt>t.jenness@jach.hawaii.eduE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2007-2009 Science and Technology Facilities Council.
+Copyright (C) 2007-2011 Science and Technology Facilities Council.
 Copyright (C) 2001-2005 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful,but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place,Suite 330, Boston, MA  02111-1307, USA
 
 =cut
 

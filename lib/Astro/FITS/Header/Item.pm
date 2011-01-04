@@ -121,7 +121,7 @@ Supplied value is always upper-cased.
 
 sub keyword {
   my $self = shift;
-  if (@_) { 
+  if (@_) {
     $self->{Keyword} = uc(shift);
     $self->{Card} = undef;
   }
@@ -175,7 +175,7 @@ When a new value is supplied any C<card> in the cache is invalidated.
 
 sub comment {
   my $self = shift;
-  if (@_) { 
+  if (@_) {
     $self->{Comment} = shift;
     $self->{Card} = undef;
   }
@@ -206,7 +206,7 @@ The type is case-insensitive, but will always be returned up-cased.
 
 sub type {
   my $self = shift;
-  if (@_) { 
+  if (@_) {
     my $type = shift;
     $type = uc($type) if defined $type;
     $self->{Type} = $type;
@@ -400,7 +400,7 @@ Returns an empty list on error.
 #      follows the first equals sign.  The comment is delimited by a
 #      solidus following a string or a single value.   The HIERARCH
 #      keyword may follow a blank keyword in columns 1:8..
-#      
+#
 # The value can contain:
 #  STRINGS:
 #      '  starting at position 12
@@ -458,7 +458,7 @@ sub parse_card {
     $self->type( "BLANK" );
     return( undef, undef, undef);
   }
-  
+
   # Check for comment or HISTORY
   # If the card is not padded this may trigger a warning on the
   # substr going out of bounds
@@ -475,7 +475,7 @@ sub parse_card {
     } else {
        $comment = "";
     }
-    
+
     # Alasdair wanted to store this as a value
     $self->comment( $comment );
 
@@ -612,7 +612,7 @@ sub parse_card {
     if ($comment =~ /^\s+$/) {
       $comment  = ' ';
     } else {
-      # Trim it 
+      # Trim it
       $comment =~ s/\s+$//;
       $comment =~ s/^\s+//;
     }
@@ -716,7 +716,7 @@ sub equals {
 =item B<_stringify>
 
 Internal routine to generate a FITS header card using the contents of
-the object. This rouinte should not be called directly. Use the 
+the object. This rouinte should not be called directly. Use the
 C<card> method to retrieve the contents.
 
   $card = $item->_stringify;
@@ -780,7 +780,7 @@ sub _stringify {
 
     # Numbers behave identically whether they are float or int
     # Logical is a number formatted as a "T" or "F"
-    if ($type eq 'INT' or $type eq 'FLOAT' or $type eq 'LOGICAL' or 
+    if ($type eq 'INT' or $type eq 'FLOAT' or $type eq 'LOGICAL' or
        $type eq 'UNDEF') {
 
       # Change the value for logical
@@ -791,7 +791,7 @@ sub _stringify {
       # An undefined value should simply propogate as an empty
       $value = '' unless defined $value;
 
-      # A number can only be up to 67 characters long but 
+      # A number can only be up to 67 characters long but
       # Should we raise an error if it is longer? We should
       # not truncate
       $value = substr($value,0,67);
@@ -809,7 +809,7 @@ sub _stringify {
       # Check that a value is there
       # There is a distinction between '''' and nothing ''
       if (defined $value) {
-	
+
 	# Escape single quotes
 	$value =~ s/'/''/g;  #';
 
@@ -820,7 +820,7 @@ sub _stringify {
 	# closing quote at CHAR 20
 	if (length($value) < 8 ) {
 	   $value = $value.(' 'x(8-length($value))) unless length($value) == 0;
-	}  
+	}
 	$value = "'$value'";
 
       } else {
@@ -895,8 +895,18 @@ Copyright (C) 2008-2009 Science and Technology Facilities Council.
 Copyright (C) 2001-2007 Particle Physics and Astronomy Research Council.
 All Rights Reserved.
 
-This program is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful,but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place,Suite 330, Boston, MA  02111-1307, USA
 
 =head1 AUTHORS
 
@@ -905,5 +915,4 @@ Alasdair Allan E<lt>aa@astro.ex.ac.ukE<gt>
 
 =cut
 
-#     $Id$
 1;

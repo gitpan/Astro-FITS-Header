@@ -9,9 +9,10 @@ author:
 build_requires:
   Test::More: 0
 configure_requires:
-  Module::Build: 0.36
-generated_by: 'Module::Build version 0.3607'
-license: gpl
+  Module::Build: 0.3
+dynamic_config: 1
+generated_by: 'Module::Build version 0.4, CPAN::Meta::Converter version 2.120921'
+license: open_source
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
@@ -31,10 +32,10 @@ provides:
     version: 3.01
   Astro::FITS::Header::Item:
     file: lib/Astro/FITS/Header/Item.pm
-    version: 3.01
+    version: 3.02
   Astro::FITS::Header::NDF:
     file: lib/Astro/FITS/Header/NDF.pm
-    version: 3.01
+    version: 3.02
   Astro::FITS::HeaderCollection:
     file: lib/Astro/FITS/Header.pm
     version: 3.01
@@ -45,4 +46,4 @@ resources:
   homepage: http://github.com/timj/perl-Astro-FITS-Header/tree/master
   license: http://opensource.org/licenses/gpl-license.php
   repository: git://github.com/timj/perl-Astro-FITS-Header.git
-version: 3.03
+version: 3.04

@@ -1,6 +1,5 @@
 lib/Astro/FITS/Header/AST.pm
 lib/Astro/FITS/Header/CFITSIO.pm
-ChangeLog
 GPL
 lib/Astro/FITS/Header.pm
 lib/Astro/FITS/Header/Item.pm
@@ -22,3 +21,4 @@ t/subhdr.t
 t/merge.t
 TODO
 META.yml
+META.json

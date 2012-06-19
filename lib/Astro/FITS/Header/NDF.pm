@@ -44,7 +44,7 @@ use base qw/ Astro::FITS::Header /;
 
 use vars qw/ $VERSION /;
 
-$VERSION = 3.01;
+$VERSION = 3.02;
 
 =head1 METHODS
 
@@ -376,6 +376,13 @@ sub writehdr {
     dat_put1c($fitsloc, scalar(@cards), @cards, $status);
     dat_annul($fitsloc, $status);
   }
+
+  # Write HISTORY information
+  my @text =("Astro::FITS::Header::NDF - write FITS header to file ^FILE",);
+  ndf_msg( "FILE", $ndfid );
+  ndf_hput("NORMAL", '', 0, scalar(@text), @text, 1, 1,1, $ndfid, $status );
+
+  ndf_annul( $ndfid, $status );
 
   # Shutdown
   ndf_end($status) if $ndfstarted;

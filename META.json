@@ -46,7 +46,7 @@
       },
       "Astro::FITS::Header::CFITSIO" : {
          "file" : "lib/Astro/FITS/Header/CFITSIO.pm",
-         "version" : "3.01"
+         "version" : "3.02"
       },
       "Astro::FITS::Header::GSD" : {
          "file" : "lib/Astro/FITS/Header/GSD.pm",
@@ -75,5 +75,5 @@
          "url" : "git://github.com/timj/perl-Astro-FITS-Header.git"
       }
    },
-   "version" : "3.06"
+   "version" : "3.07"
 }

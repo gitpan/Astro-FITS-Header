@@ -40,7 +40,7 @@ use base qw/ Astro::FITS::Header /;
 use Astro::FITS::CFITSIO qw / :longnames :constants /;
 use Carp;
 
-$VERSION = 3.01;
+$VERSION = 3.02;
 
 # C O N S T R U C T O R ----------------------------------------------------
 
@@ -139,7 +139,7 @@ sub configure {
          $ifits->get_num_hdus($nhdus,$status);
          foreach my $ihdu (1 .. $nhdus-1) {
 	   my $subfr = sprintf("%s[%d]",$args{File},$ihdu);
-	   my $sself = $self->new(File=>$subfr);
+	   my $sself = $self->new(File=>$subfr, ReadOnly => $args{ReadOnly});
 	   push @subfrms,$sself;
          }
        }
